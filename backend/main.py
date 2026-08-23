@@ -125,9 +125,43 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN email TEXT")
     except sqlite3.OperationalError:
         pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN age INTEGER")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN otp_code TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN otp_expiry TEXT")
+    except sqlite3.OperationalError:
+        pass
         
     conn.commit()
+
+    # Auto-seed default Parent and Child users if the database is fresh/empty
+    try:
+        cursor.execute("SELECT COUNT(*) as count FROM users")
+        row = cursor.fetchone()
+        if row and row[0] == 0:
+            cursor.execute("INSERT INTO users (id, username, role, parent_id) VALUES (1, 'Parent User', 'parent', NULL)")
+            cursor.execute("INSERT INTO users (id, username, role, parent_id) VALUES (2, 'Child User', 'child', 1)")
+            conn.commit()
+            print("🚀 Successfully auto-seeded default users!")
+    except Exception as e:
+        print(f"Error seeding users: {e}")
+        
     conn.close()
+
 
 init_db()
 
@@ -157,6 +191,21 @@ class UserResponse(BaseModel):
     role: str
     parent_id: Optional[int] = None
     email: Optional[str] = None
+    age: Optional[int] = None
+    phone: Optional[str] = None
+
+class SendOtpRequest(BaseModel):
+    email: str
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    otp_code: str
+    username: str
+    age: int
+    phone: str
+    role: str                       # 'parent' or 'child'
+    parent_id: Optional[int] = None
+
 
 class MedicationCreate(BaseModel):
     name: str
@@ -198,6 +247,105 @@ def get_db_connection():
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+@app.post("/api/auth/send-otp")
+def send_otp(req: SendOtpRequest):
+    import random
+    from datetime import datetime, timedelta
+    
+    otp = f"{random.randint(100000, 999999)}"
+    expiry = (datetime.now() + timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if user already exists
+    cursor.execute("SELECT id FROM users WHERE email = ?", (req.email,))
+    user = cursor.fetchone()
+    
+    if user:
+        # Update existing user record with OTP
+        cursor.execute(
+            "UPDATE users SET otp_code = ?, otp_expiry = ? WHERE id = ?",
+            (otp, expiry, user["id"])
+        )
+    else:
+        # Insert temporary pending user record with OTP
+        cursor.execute(
+            "INSERT INTO users (username, role, email, otp_code, otp_expiry) VALUES (?, ?, ?, ?, ?)",
+            (f"Pending_{otp}", "child", req.email, otp, expiry)
+        )
+        
+    conn.commit()
+    conn.close()
+    
+    # Send email containing the OTP
+    email_body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center;">
+                <h2 style="color: #0ea5e9; margin-top: 0; font-size: 24px;">🔑 Aegis AI Verification</h2>
+                <p style="font-size: 16px; color: #334155; line-height: 1.5;">
+                    Your one-time verification code (OTP) for Aegis AI is:
+                </p>
+                <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #0ea5e9;">
+                    {otp}
+                </div>
+                <p style="font-size: 14px; color: #64748b;">
+                    This code will expire in 5 minutes. If you did not request this, please ignore this email.
+                </p>
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+                <span style="font-size: 11px; color: #94a3b8;">Aegis AI Smart Medication Adherence</span>
+            </div>
+        </body>
+    </html>
+    """
+    
+    # Run in a background thread to prevent blocking
+    threading.Thread(
+        target=send_alert_email,
+        args=(req.email, "🔑 Your Aegis AI OTP Verification Code", email_body)
+    ).start()
+    
+    return {"message": "OTP sent successfully to your email."}
+
+@app.post("/api/auth/verify-otp", response_model=UserResponse)
+def verify_otp(req: VerifyOtpRequest):
+    from datetime import datetime
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Fetch user matching email and OTP
+    cursor.execute(
+        "SELECT * FROM users WHERE email = ? AND otp_code = ?",
+        (req.email, req.otp_code)
+    )
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid OTP code.")
+        
+    # Check OTP expiry
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if user["otp_expiry"] < now_str:
+        conn.close()
+        raise HTTPException(status_code=400, detail="OTP code has expired.")
+        
+    # Valid OTP! Update user details (complete sign-up/login)
+    cursor.execute(
+        "UPDATE users SET username = ?, age = ?, phone = ?, role = ?, parent_id = ?, otp_code = NULL, otp_expiry = NULL WHERE id = ?",
+        (req.username, req.age, req.phone, req.role, req.parent_id, user["id"])
+    )
+    conn.commit()
+    
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user["id"],))
+    logged_user = dict(cursor.fetchone())
+    conn.close()
+    
+    return logged_user
+
 
 # --- User Endpoints ---
 @app.post("/api/users", response_model=UserResponse)

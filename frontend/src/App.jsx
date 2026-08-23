@@ -103,6 +103,79 @@ export default function App() {
   
   const chatMessagesEndRef = useRef(null);
 
+  // Login & OTP Auth State Variables
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginName, setLoginName] = useState("");
+  const [loginAge, setLoginAge] = useState("");
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginRole, setLoginRole] = useState("parent");
+  const [loginOtp, setLoginOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    if (!loginEmail) return;
+    setIsSendingOtp(true);
+    setLoginError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail })
+      });
+      if (res.ok) {
+        setOtpSent(true);
+      } else {
+        const data = await res.json();
+        setLoginError(data.detail || "Failed to send OTP.");
+      }
+    } catch (err) {
+      setLoginError("Connection error. Please check your internet.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (!loginOtp || !loginName || !loginAge || !loginPhone) return;
+    setIsVerifyingOtp(true);
+    setLoginError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: loginEmail,
+          otp_code: loginOtp,
+          username: loginName,
+          age: Number(loginAge),
+          phone: loginPhone,
+          role: loginRole,
+          parent_id: loginRole === 'child' ? 1 : null
+        })
+      });
+      if (res.ok) {
+        const user = await res.json();
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        setLoginError(data.detail || "Invalid OTP code.");
+      }
+    } catch (err) {
+      setLoginError("Verification failed. Please try again.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+
   // Helper date strings
   const getTodayString = () => {
     const d = new Date();
@@ -622,6 +695,140 @@ export default function App() {
       Notification.requestPermission();
     }
   }, []);
+
+  if (!isLoggedIn) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '1.5rem', background: '#090d16' }}>
+        <div className="glass-card" style={{ maxWidth: '450px', width: '100%', padding: '2.5rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <Pill size={48} style={{ color: 'var(--color-accent)', marginBottom: '0.75rem', filter: 'drop-shadow(0 0 12px var(--color-accent))' }} />
+            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.025em', color: '#fff', marginBottom: '0.25rem' }}>Aegis AI Authentication</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Smart Medication Adherence Monitor</p>
+          </div>
+
+          {loginError && (
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171', padding: '0.75rem 1rem', borderRadius: '12px', fontSize: '0.82rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+              ⚠️ {loginError}
+            </div>
+          )}
+
+          {!otpSent ? (
+            <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="form-group">
+                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Full Name</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="e.g. John Doe"
+                  value={loginName}
+                  onChange={(e) => setLoginName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Age</label>
+                  <input 
+                    type="number" 
+                    className="form-control" 
+                    placeholder="e.g. 35"
+                    value={loginAge}
+                    onChange={(e) => setLoginAge(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Role</label>
+                  <select 
+                    className="form-control" 
+                    value={loginRole} 
+                    onChange={(e) => setLoginRole(e.target.value)}
+                    style={{ background: '#121826', border: '1px solid rgba(255, 255, 255, 0.08)', color: '#fff' }}
+                  >
+                    <option value="parent">Parent</option>
+                    <option value="child">Child</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Phone Number</label>
+                <input 
+                  type="tel" 
+                  className="form-control" 
+                  placeholder="e.g. +91 9876543210"
+                  value={loginPhone}
+                  onChange={(e) => setLoginPhone(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Email ID</label>
+                <input 
+                  type="email" 
+                  className="form-control" 
+                  placeholder="e.g. user@gmail.com"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                disabled={isSendingOtp}
+                style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}
+              >
+                {isSendingOtp ? "Sending OTP..." : "Send Verification OTP"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.15)', color: '#38bdf8', padding: '0.75rem 1rem', borderRadius: '12px', fontSize: '0.82rem', textAlign: 'center', lineHeight: '1.4' }}>
+                📧 An OTP verification code was sent to <strong style={{ color: '#fff' }}>{loginEmail}</strong>. Please enter the code below to complete sign in.
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'center', display: 'block', marginBottom: '0.5rem' }}>Enter 6-Digit OTP Code</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="e.g. 123456"
+                  maxLength={6}
+                  value={loginOtp}
+                  onChange={(e) => setLoginOtp(e.target.value)}
+                  style={{ fontSize: '1.5rem', textAlign: 'center', letterSpacing: '8px', fontWeight: '700', color: 'var(--color-accent)' }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={() => setOtpSent(false)}
+                  style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-secondary)' }}
+                >
+                  Back
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={isVerifyingOtp}
+                  style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}
+                >
+                  {isVerifyingOtp ? "Verifying..." : "Verify & Log In"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
