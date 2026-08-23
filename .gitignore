@@ -1,0 +1,21 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+__pycache__/
+*.pyc
+
+# Node/Vite Build files
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+
+# Local Database Files
+backend/database.db
+database.db
+
+# OS specific files
+.DS_Store
+Thumbs.db

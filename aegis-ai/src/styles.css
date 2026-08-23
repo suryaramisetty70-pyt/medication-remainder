@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  --color-obsidian: #09090b;
+  --color-obsidian-2: #0d0d10;
+  --color-obsidian-3: #111114;
+
+  --color-fg: #f4f4f5;
+  --color-fg-muted: #a1a1aa;
+  --color-fg-faint: #71717a;
+
+  --color-cyan: #22d3ee;
+  --color-teal: #2dd4bf;
+  --color-emerald: #34d399;
+  --color-amber: #fbbf24;
+  --color-danger: #f87171;
+
+  --color-glass: rgb(255 255 255 / 0.035);
+  --color-glass-strong: rgb(255 255 255 / 0.06);
+  --color-hairline: rgb(255 255 255 / 0.08);
+
+  --shadow-glass: 0 20px 60px rgb(0 0 0 / 0.35);
+  --shadow-glow-cyan: 0 0 0 1px rgb(34 211 238 / 0.25), 0 0 32px -8px rgb(34 211 238 / 0.45);
+  --shadow-glow-emerald: 0 0 0 1px rgb(52 211 153 / 0.3), 0 0 32px -8px rgb(52 211 153 / 0.45);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  background:
+    radial-gradient(1200px 700px at 70% -10%, rgb(34 211 238 / 0.07), transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, rgb(45 212 191 / 0.05), transparent 60%),
+    var(--color-obsidian);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: rgb(34 211 238 / 0.25); }
+
+:focus-visible {
+  outline: 2px solid var(--color-cyan);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---------- Glass system ---------- */
+@utility glass {
+  background: var(--color-glass);
+  border: 1px solid var(--color-hairline);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+@utility glass-strong {
+  background: var(--color-glass-strong);
+  border: 1px solid rgb(255 255 255 / 0.11);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  box-shadow: var(--shadow-glass), inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+/* cursor spotlight, fed by --mx / --my */
+@utility spotlight {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      340px circle at var(--mx, 50%) var(--my, 0%),
+      rgb(34 211 238 / 0.09),
+      transparent 70%
+    );
+    opacity: 0;
+    transition: opacity 0.35s var(--ease-out-expo);
+    pointer-events: none;
+    z-index: -1;
+  }
+  &:hover::before { opacity: 1; }
+}
+
+/* travelling reflection on hover */
+@utility sheen {
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgb(255 255 255 / 0.07) 50%, transparent 60%);
+    transform: translateX(-120%);
+    transition: transform 0.9s var(--ease-out-expo);
+    pointer-events: none;
+  }
+  &:hover::after { transform: translateX(120%); }
+}
+
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+@utility safe-b { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+@utility safe-t { padding-top: max(0.5rem, env(safe-area-inset-top)); }
+
+@utility scroll-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@keyframes aegis-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.9); }
+}
+@utility status-ping {
+  animation: aegis-pulse 2.4s var(--ease-out-expo) infinite;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+@utility scanline { animation: scanline 2.6s linear infinite; }
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.04);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.07), transparent);
+    animation: shimmer 1.6s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
