@@ -46,15 +46,30 @@ def send_alert_email(to_email: str, subject: str, body: str):
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'html'))
     
+    # Try Port 587 (TLS) first
     try:
-        server = smtplib.SMTP(smtp_server, port)
+        print(f"📧 Attempting to send email via TLS (port 587)...")
+        server = smtplib.SMTP(smtp_server, 587, timeout=10)
         server.starttls()
         server.login(sender, password)
         server.sendmail(sender, to_email, msg.as_string())
         server.quit()
-        print(f"📧 Alert email sent to {to_email} successfully!")
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
+        print(f"📧 Alert email sent to {to_email} successfully via TLS (587)!")
+        return
+    except Exception as e587:
+        print(f"⚠️ Port 587 failed: {e587}. Retrying via SSL (port 465)...")
+        
+    # Try Port 465 (SSL) as fallback
+    try:
+        server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
+        server.login(sender, password)
+        server.sendmail(sender, to_email, msg.as_string())
+        server.quit()
+        print(f"📧 Alert email sent to {to_email} successfully via SSL (465)!")
+        return
+    except Exception as e465:
+        print(f"❌ Failed to send email via both ports. SSL error: {e465}")
+
 
 # SQLite Database Setup
 
