@@ -31,14 +31,14 @@ import threading
 
 def send_alert_email(to_email: str, subject: str, body: str):
     smtp_server = "smtp.gmail.com"
-    port = 587
     sender = os.getenv("SMTP_SENDER", "suryaramisetty70@gmail.com")
     password = os.getenv("SMTP_PASSWORD", "ykqa kpvp nlnw swhk")
     
     if not sender or not password:
-        print("📧 SMTP credentials not configured. Skipping email send.")
-        return
-
+        raise HTTPException(
+            status_code=500,
+            detail="SMTP credentials are not configured. Please set SMTP_SENDER and SMTP_PASSWORD."
+        )
         
     msg = MIMEMultipart()
     msg['From'] = sender
@@ -55,7 +55,7 @@ def send_alert_email(to_email: str, subject: str, body: str):
         server.sendmail(sender, to_email, msg.as_string())
         server.quit()
         print(f"📧 Alert email sent to {to_email} successfully via TLS (587)!")
-        return
+        return True
     except Exception as e587:
         print(f"⚠️ Port 587 failed: {e587}. Retrying via SSL (port 465)...")
         
@@ -66,9 +66,14 @@ def send_alert_email(to_email: str, subject: str, body: str):
         server.sendmail(sender, to_email, msg.as_string())
         server.quit()
         print(f"📧 Alert email sent to {to_email} successfully via SSL (465)!")
-        return
+        return True
     except Exception as e465:
         print(f"❌ Failed to send email via both ports. SSL error: {e465}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Email delivery failed. Port 587 error: {str(e587)}, Port 465 error: {str(e465)}"
+        )
+
 
 
 # SQLite Database Setup
@@ -342,13 +347,11 @@ def send_otp(req: SendOtpRequest):
     </html>
     """
     
-    # Run in a background thread to prevent blocking
-    threading.Thread(
-        target=send_alert_email,
-        args=(req.email, "🔑 Your Aegis AI OTP Verification Code", email_body)
-    ).start()
+    # Send email containing the OTP synchronously to catch connection/config errors immediately
+    send_alert_email(req.email, "🔑 Your Aegis AI OTP Verification Code", email_body)
     
     return {"message": "OTP sent successfully to your email."}
+
 
 @app.post("/api/auth/verify-otp", response_model=UserResponse)
 def verify_otp(req: VerifyOtpRequest):
@@ -448,13 +451,12 @@ def update_user_email(user_id: int, req: UserEmailUpdate):
 def get_medications(child_id: Optional[int] = None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    if child_id is not None:
-        cursor.execute("SELECT * FROM medications WHERE active = 1 AND child_id = ?", (child_id,))
-    else:
-        cursor.execute("SELECT * FROM medications WHERE active = 1")
+    # Share medications across profiles for seamless parent/child bridging
+    cursor.execute("SELECT * FROM medications WHERE active = 1")
     meds = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return meds
+
 
 @app.post("/api/medications", response_model=MedicationResponse)
 def add_medication(med: MedicationCreate):
@@ -504,16 +506,13 @@ def get_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, c
     """
     params = [f"{start_date} 00:00", f"{end_date} 23:59"]
     
-    if child_id is not None:
-        query += " AND l.child_id = ?"
-        params.append(child_id)
-        
     query += " ORDER BY l.scheduled_time ASC"
     
     cursor.execute(query, tuple(params))
     logs = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return logs
+
 
 @app.post("/api/logs")
 def log_adherence(log: LogCreate):
@@ -543,19 +542,25 @@ def log_adherence(log: LogCreate):
     conn.commit()
 
     # Trigger email notification to parent if medication status is 'missed'
+    # Trigger email notification to parent if medication status is 'missed'
     if log.status == "missed":
         try:
             # Query parent user details and email for child
-            cursor.execute("""
-                SELECT p.email as parent_email, c.username as child_name, m.name as med_name, m.dosage
-                FROM users c
-                JOIN users p ON c.parent_id = p.id
-                JOIN medications m ON m.id = ?
-                WHERE c.id = ?
-            """, (log.medication_id, log.child_id))
-            row = cursor.fetchone()
+            cursor.execute("SELECT email FROM users WHERE role = 'parent' AND email IS NOT NULL AND email != '' LIMIT 1")
+            parent_row = cursor.fetchone()
             
-            if row and row["parent_email"]:
+            cursor.execute("SELECT username FROM users WHERE id = ?", (log.child_id,))
+            child_row = cursor.fetchone()
+            child_name = child_row["username"] if child_row else "Child"
+            
+            cursor.execute("SELECT name, dosage FROM medications WHERE id = ?", (log.medication_id,))
+            med_row = cursor.fetchone()
+            
+            if parent_row and parent_row["email"] and med_row:
+                parent_email = parent_row["email"]
+                med_name = med_row["name"]
+                med_dosage = med_row["dosage"]
+                
                 email_body = f"""
                 <html>
                     <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px;">
@@ -565,11 +570,11 @@ def log_adherence(log: LogCreate):
                                 Hello,
                             </p>
                             <p style="font-size: 16px; color: #334155; line-height: 1.5;">
-                                Your child, <strong>{row["child_name"]}</strong>, has <strong>MISSED</strong> their medication dose:
+                                Your child, <strong>{child_name}</strong>, has <strong>MISSED</strong> their medication dose:
                             </p>
                             <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
-                                <strong style="color: #0f172a; font-size: 18px;">{row["med_name"]}</strong><br>
-                                <span style="color: #64748b; font-size: 14px;">Dosage: {row["dosage"]}</span>
+                                <strong style="color: #0f172a; font-size: 18px;">{med_name}</strong><br>
+                                <span style="color: #64748b; font-size: 14px;">Dosage: {med_dosage}</span>
                             </div>
                             <p style="font-size: 16px; color: #334155; line-height: 1.5;">
                                 Please check on them as soon as possible.
@@ -584,10 +589,11 @@ def log_adherence(log: LogCreate):
                 # Send email asynchronously to avoid blocking API response times
                 threading.Thread(
                     target=send_alert_email,
-                    args=(row["parent_email"], f"🚨 ALERT: {row['child_name']} missed {row['med_name']}", email_body)
+                    args=(parent_email, f"🚨 ALERT: {child_name} missed {med_name}", email_body)
                 ).start()
         except Exception as err:
             print(f"Error preparing email alert: {err}")
+
             
     conn.close()
     return {"message": "Adherence logged successfully"}

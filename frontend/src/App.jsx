@@ -843,25 +843,40 @@ export default function App() {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {/* User view switcher dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.25rem 0.75rem', borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Role:</span>
-            <select 
-              value={currentUser?.id || ""} 
-              onChange={(e) => {
-                const selectedId = Number(e.target.value);
-                const u = users.find(user => user.id === selectedId);
-                if (u) setCurrentUser(u);
+          {/* Logged in User Profile & Log Out */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.35rem 0.85rem', borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+              👤 {currentUser?.username} ({currentUser?.role?.toUpperCase()})
+            </span>
+            <button 
+              onClick={() => {
+                setIsLoggedIn(false);
+                setOtpSent(false);
+                setLoginOtp("");
+                setLoginError("");
               }}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+              style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '12px',
+                color: '#f87171',
+                padding: '0.2rem 0.6rem',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(239, 68, 68, 0.25)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(239, 68, 68, 0.15)';
+              }}
             >
-              {users.map(u => (
-                <option key={u.id} value={u.id} style={{ background: '#18181b', color: '#fff' }}>
-                  {u.username} ({u.role.toUpperCase()})
-                </option>
-              ))}
-            </select>
+              Log Out
+            </button>
           </div>
+
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             <Activity size={12} className="logo-icon" />
