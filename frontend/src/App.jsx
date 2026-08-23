@@ -59,12 +59,7 @@ const stopAlarmSound = () => {
   }
 };
 
-// Fallback to laptop IP when on mobile phone (WebView uses localhost/capacitor://)
-const API_BASE_URL = (
-  window.location.hostname === 'localhost' || 
-  window.location.hostname === '127.0.0.1' || 
-  !window.location.hostname
-) ? `http://192.168.29.219:8000` : `http://${window.location.hostname}:8000`;
+const API_BASE_URL = "https://medication-remainder.onrender.com";
 
 
 export default function App() {
@@ -77,6 +72,8 @@ export default function App() {
   ]);
   const [currentUser, setCurrentUser] = useState({ id: 2, username: "Child User", role: "child", parent_id: 1 });
   const [parentAlerts, setParentAlerts] = useState([]);
+  const [parentEmail, setParentEmail] = useState("");
+
   
   // Form fields
   const [newMedName, setNewMedName] = useState("");
@@ -171,11 +168,37 @@ export default function App() {
         setUsers(data);
         const defaultUser = data.find(u => u.role === 'child') || data[0];
         setCurrentUser(defaultUser);
+        
+        const parentUser = data.find(u => u.role === 'parent');
+        if (parentUser && parentUser.email) {
+          setParentEmail(parentUser.email);
+        }
       }
     } catch (err) {
       console.error("Error fetching users:", err);
     }
   };
+
+  const handleSaveEmail = async (e) => {
+    e.preventDefault();
+    const parentUser = users.find(u => u.role === 'parent');
+    if (!parentUser) return;
+    
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/${parentUser.id}/email`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: parentEmail })
+      });
+      if (res.ok) {
+        fetchUsers();
+        alert("Alert email updated successfully!");
+      }
+    } catch (err) {
+      console.error("Error saving email:", err);
+    }
+  };
+
 
   useEffect(() => {
     fetchUsers();
@@ -769,6 +792,33 @@ export default function App() {
               </form>
             </div>
           )}
+
+          {/* Parent Alert Email Configuration Card */}
+          {currentUser?.role === 'parent' && (
+            <div className="glass-card" style={{ marginTop: '-1rem', background: 'rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.15)' }}>
+              <h3 className="card-title" style={{ color: 'var(--color-accent)' }}><Bell size={18} /> Email Notification Alerts</h3>
+              <form onSubmit={handleSaveEmail}>
+                <div className="form-group">
+                  <label>Parent's Registered Email</label>
+                  <input 
+                    type="email" 
+                    className="form-control" 
+                    placeholder="e.g. parent@example.com" 
+                    value={parentEmail}
+                    onChange={(e) => setParentEmail(e.target.value)}
+                    required
+                  />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                    Alerts are sent to this address immediately if a dose is skipped or missed.
+                  </span>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--color-accent)', width: 'auto', padding: '0.45rem 1rem', fontSize: '0.85rem' }}>
+                  Save Email Address
+                </button>
+              </form>
+            </div>
+          )}
+
 
           {/* Scheduled Medications Inventory List */}
           <div className="glass-card">
