@@ -102,6 +102,32 @@ export default function App() {
   const prevAlertsCount = useRef(0);
   
   const chatMessagesEndRef = useRef(null);
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
+
+  const handleUnlockAudio = () => {
+    if (isAudioUnlocked) return;
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      // Play a quick silent beep to satisfy browser interaction policy
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+      setIsAudioUnlocked(true);
+      console.log("🔊 Audio autoplay context unlocked successfully!");
+    } catch (e) {
+      console.warn("Failed to unlock audio context:", e);
+    }
+  };
+
 
   // Login & OTP Auth State Variables
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -163,6 +189,7 @@ export default function App() {
         const user = await res.json();
         setCurrentUser(user);
         setIsLoggedIn(true);
+        handleUnlockAudio();
         fetchUsers();
       } else {
         const data = await res.json();
@@ -191,9 +218,9 @@ export default function App() {
   };
 
   // Fetch Data
-  const fetchMedications = async (childId = getChildId()) => {
+  const fetchMedications = async (familyId = currentUser?.family_id || 'FAM-DEFAULT') => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/medications?child_id=${childId}`);
+      const res = await fetch(`${API_BASE_URL}/api/medications?family_id=${familyId}`);
       if (res.ok) {
         const data = await res.json();
         setMedications(data);
@@ -203,7 +230,7 @@ export default function App() {
     }
   };
 
-  const fetchLogs = async (childId = getChildId()) => {
+  const fetchLogs = async (familyId = currentUser?.family_id || 'FAM-DEFAULT') => {
     const today = new Date();
     const start = new Date();
     start.setDate(today.getDate() - 7); // Last 7 days
@@ -211,7 +238,7 @@ export default function App() {
     const endStr = today.toISOString().split('T')[0];
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/logs?start_date=${startStr}&end_date=${endStr}&child_id=${childId}`);
+      const res = await fetch(`${API_BASE_URL}/api/logs?start_date=${startStr}&end_date=${endStr}&family_id=${familyId}`);
       if (res.ok) {
         const data = await res.json();
         setLogs(data);
@@ -221,9 +248,10 @@ export default function App() {
     }
   };
 
-  const fetchParentAlerts = async (childId = getChildId()) => {
+  const fetchParentAlerts = async (familyId = currentUser?.family_id || 'FAM-DEFAULT') => {
+    if (!familyId) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/parent/alerts/${childId}`);
+      const res = await fetch(`${API_BASE_URL}/api/parent/alerts/${familyId}`);
       if (res.ok) {
         const data = await res.json();
         setParentAlerts(data);
@@ -232,6 +260,7 @@ export default function App() {
       console.error("Error fetching parent alerts:", err);
     }
   };
+
 
   const fetchUsers = async () => {
     try {
@@ -283,23 +312,25 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser) {
-      const childId = getChildId();
-      fetchMedications(childId);
-      fetchLogs(childId);
-      fetchParentAlerts(childId); // Always fetch alerts regardless of role
+      const familyId = currentUser.family_id || 'FAM-DEFAULT';
+      fetchMedications(familyId);
+      fetchLogs(familyId);
+      fetchParentAlerts(familyId);
     }
-  }, [currentUser, users]);
+  }, [currentUser]);
 
   // Poll for parent alerts ALWAYS (every 5 seconds) — works in both parent AND child mode
   useEffect(() => {
     if (!currentUser) return;
+    const familyId = currentUser.family_id || 'FAM-DEFAULT';
     
     const interval = setInterval(() => {
-      fetchParentAlerts(getChildId());
-      fetchLogs(getChildId()); // Also refresh logs to keep dashboard in sync
+      fetchParentAlerts(familyId);
+      fetchLogs(familyId); // Also refresh logs to keep dashboard in sync
     }, 5000);
     return () => clearInterval(interval);
-  }, [currentUser, users]);
+  }, [currentUser]);
+
 
   // Fire browser notification + in-app toast when new parent alerts appear
   // Works in BOTH parent and child mode — parent always gets notified
@@ -420,6 +451,8 @@ export default function App() {
     e.preventDefault();
     if (!newMedName || !newMedDosage || !newMedTime) return;
 
+    const familyId = currentUser?.family_id || 'FAM-DEFAULT';
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/medications`, {
         method: "POST",
@@ -429,7 +462,7 @@ export default function App() {
           dosage: newMedDosage,
           schedule_time: newMedTime,
           instruction: newMedInstruction,
-          child_id: getChildId()
+          family_id: familyId
         })
       });
 
@@ -438,7 +471,7 @@ export default function App() {
         setNewMedDosage("");
         setNewMedTime("");
         setNewMedInstruction("");
-        fetchMedications();
+        fetchMedications(familyId);
       }
     } catch (err) {
       console.error(err);
@@ -447,13 +480,14 @@ export default function App() {
 
   // Delete Medication handler
   const handleDeleteMedication = async (id) => {
+    const familyId = currentUser?.family_id || 'FAM-DEFAULT';
     try {
       const res = await fetch(`${API_BASE_URL}/api/medications/${id}`, {
         method: "DELETE"
       });
       if (res.ok) {
-        fetchMedications();
-        fetchLogs();
+        fetchMedications(familyId);
+        fetchLogs(familyId);
       }
     } catch (err) {
       console.error(err);
@@ -464,6 +498,7 @@ export default function App() {
   const handleLogAdherence = async (medId, status, isVerified = 0, msg = "Self-logged", imageData = null) => {
     const todayStr = getTodayString();
     const scheduledTime = `${todayStr} ${medications.find(m => m.id === medId)?.schedule_time || '00:00'}`;
+    const familyId = currentUser?.family_id || 'FAM-DEFAULT';
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/logs`, {
@@ -475,8 +510,8 @@ export default function App() {
           scheduled_time: scheduledTime,
           is_verified: isVerified,
           verification_msg: msg,
-          child_id: getChildId(),
-          image_data: imageData
+          image_data: imageData,
+          family_id: familyId
         })
       });
 
@@ -485,17 +520,18 @@ export default function App() {
         const ackKey = `${medId}-${todayStr}`;
         setAlarmAcknowledgedToday(prev => ({ ...prev, [ackKey]: true }));
         
-        fetchLogs();
+        fetchLogs(familyId);
         
         // If parent is viewing, refresh alerts too
         if (currentUser?.role === 'parent') {
-          fetchParentAlerts(getChildId());
+          fetchParentAlerts(familyId);
         }
       }
     } catch (err) {
       console.error(err);
     }
   };
+
 
   // Acknowledge alarm trigger directly from alarm popup
   const handleAlarmAction = async (status) => {
@@ -698,7 +734,8 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '1.5rem', background: '#090d16' }}>
+      <div className="app-container" onClick={handleUnlockAudio} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '1.5rem', background: '#090d16' }}>
+
         <div className="glass-card" style={{ maxWidth: '450px', width: '100%', padding: '2.5rem', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <Pill size={48} style={{ color: 'var(--color-accent)', marginBottom: '0.75rem', filter: 'drop-shadow(0 0 12px var(--color-accent))' }} />
@@ -831,7 +868,22 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <div className="app-container" onClick={handleUnlockAudio}>
+      {!isAudioUnlocked && (
+        <div style={{
+          background: 'rgba(234, 179, 8, 0.1)',
+          borderBottom: '1px solid rgba(234, 179, 8, 0.2)',
+          color: '#fbbf24',
+          textAlign: 'center',
+          padding: '0.5rem 1rem',
+          fontSize: '0.82rem',
+          fontWeight: '600',
+          cursor: 'pointer'
+        }}>
+          🔊 Browser audio is currently muted. Click anywhere on the screen to unlock medication alarm sounds!
+        </div>
+      )}
+
       {/* Header */}
       <header>
         <div className="logo-section">

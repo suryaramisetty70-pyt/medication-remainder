@@ -166,6 +166,21 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN otp_expiry TEXT")
     except sqlite3.OperationalError:
         pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN family_id TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE medications ADD COLUMN family_id TEXT DEFAULT 'FAM-DEFAULT'")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE adherence_logs ADD COLUMN family_id TEXT DEFAULT 'FAM-DEFAULT'")
+    except sqlite3.OperationalError:
+        pass
         
     conn.commit()
 
@@ -174,14 +189,15 @@ def init_db():
         cursor.execute("SELECT COUNT(*) as count FROM users")
         row = cursor.fetchone()
         if row and row[0] == 0:
-            cursor.execute("INSERT INTO users (id, username, role, parent_id) VALUES (1, 'Parent User', 'parent', NULL)")
-            cursor.execute("INSERT INTO users (id, username, role, parent_id) VALUES (2, 'Child User', 'child', 1)")
+            cursor.execute("INSERT INTO users (id, username, role, parent_id, family_id) VALUES (1, 'Parent User', 'parent', NULL, 'FAM-DEFAULT')")
+            cursor.execute("INSERT INTO users (id, username, role, parent_id, family_id) VALUES (2, 'Child User', 'child', 1, 'FAM-DEFAULT')")
             conn.commit()
             print("🚀 Successfully auto-seeded default users!")
     except Exception as e:
         print(f"Error seeding users: {e}")
         
     conn.close()
+
 
 
 init_db()
@@ -214,6 +230,7 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     age: Optional[int] = None
     phone: Optional[str] = None
+    family_id: Optional[str] = None
 
 class SendOtpRequest(BaseModel):
     email: str
@@ -233,7 +250,7 @@ class MedicationCreate(BaseModel):
     dosage: str
     schedule_time: str
     instruction: Optional[str] = ""
-    child_id: Optional[int] = 1
+    family_id: Optional[str] = 'FAM-DEFAULT'
 
 class MedicationResponse(BaseModel):
     id: int
@@ -242,7 +259,7 @@ class MedicationResponse(BaseModel):
     schedule_time: str
     instruction: Optional[str]
     active: int
-    child_id: int
+    family_id: Optional[str]
 
 class LogCreate(BaseModel):
     medication_id: int
@@ -251,8 +268,9 @@ class LogCreate(BaseModel):
     logged_time: Optional[str] = None
     is_verified: Optional[int] = 0
     verification_msg: Optional[str] = ""
-    child_id: Optional[int] = 1
     image_data: Optional[str] = None
+    family_id: Optional[str] = 'FAM-DEFAULT'
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -377,11 +395,28 @@ def verify_otp(req: VerifyOtpRequest):
         conn.close()
         raise HTTPException(status_code=400, detail="OTP code has expired.")
         
+    # Resolve or generate family_id
+    family_id = user["family_id"]
+    if not family_id or family_id == 'FAM-DEFAULT':
+        if req.role == 'parent':
+            # Generate a new family code
+            import secrets
+            family_id = f"FAM-{secrets.token_hex(4).upper()}"
+        else:
+            # Find an existing parent family in the DB to link to
+            cursor.execute("SELECT family_id FROM users WHERE role = 'parent' AND family_id IS NOT NULL AND family_id != 'FAM-DEFAULT' LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                family_id = row["family_id"]
+            else:
+                import secrets
+                family_id = f"FAM-{secrets.token_hex(4).upper()}"
+
     try:
         # Valid OTP! Update user details (complete sign-up/login)
         cursor.execute(
-            "UPDATE users SET username = ?, age = ?, phone = ?, role = ?, parent_id = ?, otp_code = NULL, otp_expiry = NULL WHERE id = ?",
-            (req.username, req.age, req.phone, req.role, req.parent_id, user["id"])
+            "UPDATE users SET username = ?, age = ?, phone = ?, role = ?, parent_id = ?, family_id = ?, otp_code = NULL, otp_expiry = NULL WHERE id = ?",
+            (req.username, req.age, req.phone, req.role, req.parent_id, family_id, user["id"])
         )
         conn.commit()
     except sqlite3.IntegrityError:
@@ -390,6 +425,7 @@ def verify_otp(req: VerifyOtpRequest):
     except Exception as e:
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
+
     
     cursor.execute("SELECT * FROM users WHERE id = ?", (user["id"],))
     logged_user = dict(cursor.fetchone())
@@ -448,11 +484,13 @@ def update_user_email(user_id: int, req: UserEmailUpdate):
 
 # --- Scoped Medications ---
 @app.get("/api/medications", response_model=List[MedicationResponse])
-def get_medications(child_id: Optional[int] = None):
+def get_medications(family_id: Optional[str] = None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Share medications across profiles for seamless parent/child bridging
-    cursor.execute("SELECT * FROM medications WHERE active = 1")
+    if family_id:
+        cursor.execute("SELECT * FROM medications WHERE active = 1 AND family_id = ?", (family_id,))
+    else:
+        cursor.execute("SELECT * FROM medications WHERE active = 1")
     meds = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return meds
@@ -464,8 +502,8 @@ def add_medication(med: MedicationCreate):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO medications (name, dosage, schedule_time, instruction, child_id) VALUES (?, ?, ?, ?, ?)",
-            (med.name, med.dosage, med.schedule_time, med.instruction, med.child_id)
+            "INSERT INTO medications (name, dosage, schedule_time, instruction, family_id) VALUES (?, ?, ?, ?, ?)",
+            (med.name, med.dosage, med.schedule_time, med.instruction, med.family_id)
         )
         med_id = cursor.lastrowid
         conn.commit()
@@ -478,6 +516,7 @@ def add_medication(med: MedicationCreate):
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.delete("/api/medications/{med_id}")
 def delete_medication(med_id: int):
     conn = get_db_connection()
@@ -487,9 +526,10 @@ def delete_medication(med_id: int):
     conn.close()
     return {"message": "Medication deleted successfully"}
 
+
 # --- Scoped Adherence Logs ---
 @app.get("/api/logs")
-def get_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, child_id: Optional[int] = None):
+def get_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, family_id: Optional[str] = None):
     if not start_date:
         start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
     if not end_date:
@@ -506,6 +546,10 @@ def get_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, c
     """
     params = [f"{start_date} 00:00", f"{end_date} 23:59"]
     
+    if family_id:
+        query += " AND l.family_id = ?"
+        params.append(family_id)
+        
     query += " ORDER BY l.scheduled_time ASC"
     
     cursor.execute(query, tuple(params))
@@ -530,26 +574,26 @@ def log_adherence(log: LogCreate):
     
     if existing:
         cursor.execute(
-            "UPDATE adherence_logs SET status = ?, logged_time = ?, is_verified = ?, verification_msg = ?, child_id = ?, image_data = ? WHERE id = ?",
-            (log.status, now_str, log.is_verified, log.verification_msg, log.child_id, log.image_data, existing["id"])
+            "UPDATE adherence_logs SET status = ?, logged_time = ?, is_verified = ?, verification_msg = ?, family_id = ?, image_data = ? WHERE id = ?",
+            (log.status, now_str, log.is_verified, log.verification_msg, log.family_id, log.image_data, existing["id"])
         )
     else:
         cursor.execute(
-            "INSERT INTO adherence_logs (medication_id, status, scheduled_time, logged_time, is_verified, verification_msg, child_id, image_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (log.medication_id, log.status, log.scheduled_time, now_str, log.is_verified, log.verification_msg, log.child_id, log.image_data)
+            "INSERT INTO adherence_logs (medication_id, status, scheduled_time, logged_time, is_verified, verification_msg, family_id, image_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (log.medication_id, log.status, log.scheduled_time, now_str, log.is_verified, log.verification_msg, log.family_id, log.image_data)
         )
     
     conn.commit()
 
     # Trigger email notification to parent if medication status is 'missed'
-    # Trigger email notification to parent if medication status is 'missed'
     if log.status == "missed":
         try:
-            # Query parent user details and email for child
-            cursor.execute("SELECT email FROM users WHERE role = 'parent' AND email IS NOT NULL AND email != '' LIMIT 1")
+            # Query parent user details dynamically using the family_id scope
+            cursor.execute("SELECT email FROM users WHERE family_id = ? AND role = 'parent' AND email IS NOT NULL AND email != '' LIMIT 1", (log.family_id,))
             parent_row = cursor.fetchone()
             
-            cursor.execute("SELECT username FROM users WHERE id = ?", (log.child_id,))
+            # Query child's name in this family
+            cursor.execute("SELECT username FROM users WHERE family_id = ? AND role = 'child' LIMIT 1", (log.family_id,))
             child_row = cursor.fetchone()
             child_name = child_row["username"] if child_row else "Child"
             
@@ -586,7 +630,7 @@ def log_adherence(log: LogCreate):
                 </html>
                 """
                 
-                # Send email asynchronously to avoid blocking API response times
+                # Send email asynchronously in thread since the handler is verified synchronous
                 threading.Thread(
                     target=send_alert_email,
                     args=(parent_email, f"🚨 ALERT: {child_name} missed {med_name}", email_body)
@@ -594,34 +638,34 @@ def log_adherence(log: LogCreate):
         except Exception as err:
             print(f"Error preparing email alert: {err}")
 
-            
     conn.close()
     return {"message": "Adherence logged successfully"}
 
 
 # --- Parent Alerts Endpoint ---
-@app.get("/api/parent/alerts/{child_id}")
-def get_parent_alerts(child_id: int):
+@app.get("/api/parent/alerts/{family_id}")
+def get_parent_alerts(family_id: str):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 1. Fetch child's active medications
-    cursor.execute("SELECT * FROM medications WHERE active = 1 AND child_id = ?", (child_id,))
+    # 1. Fetch child's active medications in this family
+    cursor.execute("SELECT * FROM medications WHERE active = 1 AND family_id = ?", (family_id,))
     meds = [dict(row) for row in cursor.fetchall()]
     
-    # 2. Fetch logs for today
+    # 2. Fetch logs for today in this family
     today_str = datetime.now().strftime("%Y-%m-%d")
     cursor.execute("""
         SELECT medication_id, status, scheduled_time 
         FROM adherence_logs 
-        WHERE child_id = ? AND scheduled_time LIKE ?
-    """, (child_id, f"{today_str}%"))
+        WHERE family_id = ? AND scheduled_time LIKE ?
+    """, (family_id, f"{today_str}%"))
     logs = [dict(row) for row in cursor.fetchall()]
     
     conn.close()
     
     now = datetime.now()
     alerts = []
+
     
     for med in meds:
         # Parse schedule time for today
