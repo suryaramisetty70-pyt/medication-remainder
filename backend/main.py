@@ -32,12 +32,13 @@ import threading
 def send_alert_email(to_email: str, subject: str, body: str):
     smtp_server = "smtp.gmail.com"
     port = 587
-    sender = os.getenv("SMTP_SENDER", "")
-    password = os.getenv("SMTP_PASSWORD", "")
+    sender = os.getenv("SMTP_SENDER", "suryaramisetty70@gmail.com")
+    password = os.getenv("SMTP_PASSWORD", "ykqa kpvp nlnw swhk")
     
     if not sender or not password:
         print("📧 SMTP credentials not configured. Skipping email send.")
         return
+
         
     msg = MIMEMultipart()
     msg['From'] = sender
