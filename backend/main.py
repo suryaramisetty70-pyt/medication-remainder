@@ -301,6 +301,31 @@ def send_otp(req: SendOtpRequest):
     </html>
     """
     
+    # Print to console logs as fallback so developer can see it in terminal
+    print(f"\n🔑 [MOCK OTP SERVICE] Verification OTP code for {req.email} is: {otp}\n")
+
+    # Send email containing the OTP
+    email_body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center;">
+                <h2 style="color: #0ea5e9; margin-top: 0; font-size: 24px;">🔑 Aegis AI Verification</h2>
+                <p style="font-size: 16px; color: #334155; line-height: 1.5;">
+                    Your one-time verification code (OTP) for Aegis AI is:
+                </p>
+                <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #0ea5e9;">
+                    {otp}
+                </div>
+                <p style="font-size: 14px; color: #64748b;">
+                    This code will expire in 5 minutes. If you did not request this, please ignore this email.
+                </p>
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+                <span style="font-size: 11px; color: #94a3b8;">Aegis AI Smart Medication Adherence</span>
+            </div>
+        </body>
+    </html>
+    """
+    
     # Run in a background thread to prevent blocking
     threading.Thread(
         target=send_alert_email,
@@ -333,18 +358,26 @@ def verify_otp(req: VerifyOtpRequest):
         conn.close()
         raise HTTPException(status_code=400, detail="OTP code has expired.")
         
-    # Valid OTP! Update user details (complete sign-up/login)
-    cursor.execute(
-        "UPDATE users SET username = ?, age = ?, phone = ?, role = ?, parent_id = ?, otp_code = NULL, otp_expiry = NULL WHERE id = ?",
-        (req.username, req.age, req.phone, req.role, req.parent_id, user["id"])
-    )
-    conn.commit()
+    try:
+        # Valid OTP! Update user details (complete sign-up/login)
+        cursor.execute(
+            "UPDATE users SET username = ?, age = ?, phone = ?, role = ?, parent_id = ?, otp_code = NULL, otp_expiry = NULL WHERE id = ?",
+            (req.username, req.age, req.phone, req.role, req.parent_id, user["id"])
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=400, detail="This name is already taken. Please enter a different name.")
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=str(e))
     
     cursor.execute("SELECT * FROM users WHERE id = ?", (user["id"],))
     logged_user = dict(cursor.fetchone())
     conn.close()
     
     return logged_user
+
 
 
 # --- User Endpoints ---
