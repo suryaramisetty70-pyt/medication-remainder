@@ -10,7 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image
 import google.generativeai as genai
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -22,7 +24,39 @@ if GEMINI_API_KEY:
 else:
     print("WARNING: GEMINI_API_KEY not found in environment. Running in Mock AI mode.")
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import threading
+
+def send_alert_email(to_email: str, subject: str, body: str):
+    smtp_server = "smtp.gmail.com"
+    port = 587
+    sender = os.getenv("SMTP_SENDER", "")
+    password = os.getenv("SMTP_PASSWORD", "")
+    
+    if not sender or not password:
+        print("📧 SMTP credentials not configured. Skipping email send.")
+        return
+        
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+    
+    try:
+        server = smtplib.SMTP(smtp_server, port)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, to_email, msg.as_string())
+        server.quit()
+        print(f"📧 Alert email sent to {to_email} successfully!")
+    except Exception as e:
+        print(f"❌ Failed to send email: {e}")
+
 # SQLite Database Setup
+
 DB_PATH = "database.db"
 
 def init_db():
@@ -87,6 +121,11 @@ def init_db():
     except sqlite3.OperationalError:
         pass
         
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    except sqlite3.OperationalError:
+        pass
+        
     conn.commit()
     conn.close()
 
@@ -109,11 +148,15 @@ class UserCreate(BaseModel):
     role: str                       # 'parent' or 'child'
     parent_id: Optional[int] = None
 
+class UserEmailUpdate(BaseModel):
+    email: str
+
 class UserResponse(BaseModel):
     id: int
     username: str
     role: str
     parent_id: Optional[int] = None
+    email: Optional[str] = None
 
 class MedicationCreate(BaseModel):
     name: str
@@ -188,6 +231,20 @@ def get_users():
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return users
+
+@app.put("/api/users/{user_id}/email", response_model=UserResponse)
+def update_user_email(user_id: int, req: UserEmailUpdate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET email = ? WHERE id = ?", (req.email, user_id))
+    conn.commit()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    updated_user = cursor.fetchone()
+    conn.close()
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return dict(updated_user)
+
 
 # --- Scoped Medications ---
 @app.get("/api/medications", response_model=List[MedicationResponse])
@@ -287,8 +344,57 @@ def log_adherence(log: LogCreate):
         )
     
     conn.commit()
+
+    # Trigger email notification to parent if medication status is 'missed'
+    if log.status == "missed":
+        try:
+            # Query parent user details and email for child
+            cursor.execute("""
+                SELECT p.email as parent_email, c.username as child_name, m.name as med_name, m.dosage
+                FROM users c
+                JOIN users p ON c.parent_id = p.id
+                JOIN medications m ON m.id = ?
+                WHERE c.id = ?
+            """, (log.medication_id, log.child_id))
+            row = cursor.fetchone()
+            
+            if row and row["parent_email"]:
+                email_body = f"""
+                <html>
+                    <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 20px;">
+                        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                            <h2 style="color: #ef4444; margin-top: 0; font-size: 24px;">🚨 Aegis AI Adherence Alert</h2>
+                            <p style="font-size: 16px; color: #334155; line-height: 1.5;">
+                                Hello,
+                            </p>
+                            <p style="font-size: 16px; color: #334155; line-height: 1.5;">
+                                Your child, <strong>{row["child_name"]}</strong>, has <strong>MISSED</strong> their medication dose:
+                            </p>
+                            <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+                                <strong style="color: #0f172a; font-size: 18px;">{row["med_name"]}</strong><br>
+                                <span style="color: #64748b; font-size: 14px;">Dosage: {row["dosage"]}</span>
+                            </div>
+                            <p style="font-size: 16px; color: #334155; line-height: 1.5;">
+                                Please check on them as soon as possible.
+                            </p>
+                            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                            <span style="font-size: 12px; color: #94a3b8;">Aegis AI Smart Medication Adherence Platform</span>
+                        </div>
+                    </body>
+                </html>
+                """
+                
+                # Send email asynchronously to avoid blocking API response times
+                threading.Thread(
+                    target=send_alert_email,
+                    args=(row["parent_email"], f"🚨 ALERT: {row['child_name']} missed {row['med_name']}", email_body)
+                ).start()
+        except Exception as err:
+            print(f"Error preparing email alert: {err}")
+            
     conn.close()
     return {"message": "Adherence logged successfully"}
+
 
 # --- Parent Alerts Endpoint ---
 @app.get("/api/parent/alerts/{child_id}")
@@ -480,6 +586,16 @@ async def verify_pill(
             "message": f"Logged pill ingestion for {medication_name} (Self-reported verification)."
         }
 
+# Mount the frontend/dist folder for unified deployment on Render
+dist_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../frontend/dist"))
+if os.path.exists(dist_path):
+    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
+    print(f"✅ Served frontend static assets from: {dist_path}")
+else:
+    print(f"❌ WARNING: frontend/dist directory NOT found at: {dist_path}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
