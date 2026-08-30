@@ -46,6 +46,9 @@ def send_alert_email(to_email: str, subject: str, body: str):
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'html'))
     
+    err_587 = "No attempt"
+    err_465 = "No attempt"
+
     # Try Port 587 (TLS) first
     try:
         print(f"📧 Attempting to send email via TLS (port 587)...")
@@ -57,7 +60,8 @@ def send_alert_email(to_email: str, subject: str, body: str):
         print(f"📧 Alert email sent to {to_email} successfully via TLS (587)!")
         return True
     except Exception as e587:
-        print(f"⚠️ Port 587 failed: {e587}. Retrying via SSL (port 465)...")
+        err_587 = str(e587)
+        print(f"⚠️ Port 587 failed: {err_587}. Retrying via SSL (port 465)...")
         
     # Try Port 465 (SSL) as fallback
     try:
@@ -68,11 +72,13 @@ def send_alert_email(to_email: str, subject: str, body: str):
         print(f"📧 Alert email sent to {to_email} successfully via SSL (465)!")
         return True
     except Exception as e465:
-        print(f"❌ Failed to send email via both ports. SSL error: {e465}")
+        err_465 = str(e465)
+        print(f"❌ Failed to send email via both ports. SSL error: {err_465}")
         raise HTTPException(
             status_code=500,
-            detail=f"Email delivery failed. Port 587 error: {str(e587)}, Port 465 error: {str(e465)}"
+            detail=f"Email delivery failed. Port 587 error: {err_587}, Port 465 error: {err_465}"
         )
+
 
 
 
