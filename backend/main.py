@@ -51,17 +51,17 @@ def send_alert_email(to_email: str, subject: str, body: str):
 
     # Try Port 587 (TLS) first
     try:
-        print(f"📧 Attempting to send email via TLS (port 587)...")
+        print(f"[EMAIL] Attempting to send email via TLS (port 587)...")
         server = smtplib.SMTP(smtp_server, 587, timeout=10)
         server.starttls()
         server.login(sender, password)
         server.sendmail(sender, to_email, msg.as_string())
         server.quit()
-        print(f"📧 Alert email sent to {to_email} successfully via TLS (587)!")
+        print(f"[EMAIL] Alert email sent to {to_email} successfully via TLS (587)!")
         return True
     except Exception as e587:
         err_587 = str(e587)
-        print(f"⚠️ Port 587 failed: {err_587}. Retrying via SSL (port 465)...")
+        print(f"[WARNING] Port 587 failed: {err_587}. Retrying via SSL (port 465)...")
         
     # Try Port 465 (SSL) as fallback
     try:
@@ -69,11 +69,12 @@ def send_alert_email(to_email: str, subject: str, body: str):
         server.login(sender, password)
         server.sendmail(sender, to_email, msg.as_string())
         server.quit()
-        print(f"📧 Alert email sent to {to_email} successfully via SSL (465)!")
+        print(f"[EMAIL] Alert email sent to {to_email} successfully via SSL (465)!")
         return True
     except Exception as e465:
         err_465 = str(e465)
-        print(f"❌ Failed to send email via both ports. SSL error: {err_465}")
+        print(f"[ERROR] Failed to send email via both ports. SSL error: {err_465}")
+
         raise HTTPException(
             status_code=500,
             detail=f"Email delivery failed. Port 587 error: {err_587}, Port 465 error: {err_465}"
@@ -198,7 +199,7 @@ def init_db():
             cursor.execute("INSERT INTO users (id, username, role, parent_id, family_id) VALUES (1, 'Parent User', 'parent', NULL, 'FAM-DEFAULT')")
             cursor.execute("INSERT INTO users (id, username, role, parent_id, family_id) VALUES (2, 'Child User', 'child', 1, 'FAM-DEFAULT')")
             conn.commit()
-            print("🚀 Successfully auto-seeded default users!")
+            print("[DB] Successfully auto-seeded default users!")
     except Exception as e:
         print(f"Error seeding users: {e}")
         
@@ -347,7 +348,8 @@ def send_otp(req: SendOtpRequest):
     """
     
     # Print to console logs as fallback so developer can see it in terminal
-    print(f"\n🔑 [MOCK OTP SERVICE] Verification OTP code for {req.email} is: {otp}\n")
+    print(f"\n[MOCK OTP SERVICE] Verification OTP code for {req.email} is: {otp}\n")
+
 
     # Send email containing the OTP
     email_body = f"""
@@ -843,9 +845,10 @@ async def verify_pill(
 dist_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../frontend/dist"))
 if os.path.exists(dist_path):
     app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
-    print(f"✅ Served frontend static assets from: {dist_path}")
+    print(f"[SUCCESS] Served frontend static assets from: {dist_path}")
 else:
-    print(f"❌ WARNING: frontend/dist directory NOT found at: {dist_path}")
+    print(f"[WARNING] frontend/dist directory NOT found at: {dist_path}")
+
 
 
 if __name__ == "__main__":
