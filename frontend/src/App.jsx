@@ -76,9 +76,15 @@ export default function App() {
     { id: 1, username: "Parent User", role: "parent", parent_id: null },
     { id: 2, username: "Child User", role: "child", parent_id: 1 }
   ]);
-  const [currentUser, setCurrentUser] = useState({ id: 2, username: "Child User", role: "child", parent_id: 1 });
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("aegis_current_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch(e) { return null; }
+  });
   const [parentAlerts, setParentAlerts] = useState([]);
   const [parentEmail, setParentEmail] = useState("");
+
 
   
   // Form fields
@@ -136,7 +142,10 @@ export default function App() {
 
 
   // Login & OTP Auth State Variables
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem("aegis_is_logged_in") === "true";
+  });
+
   const [loginName, setLoginName] = useState("");
   const [loginAge, setLoginAge] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
@@ -195,6 +204,10 @@ export default function App() {
         const user = await res.json();
         setCurrentUser(user);
         setIsLoggedIn(true);
+        try {
+          localStorage.setItem("aegis_current_user", JSON.stringify(user));
+          localStorage.setItem("aegis_is_logged_in", "true");
+        } catch(e) {}
         handleUnlockAudio();
         fetchUsers();
       } else {
@@ -274,13 +287,11 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setUsers(data);
-        const defaultUser = data.find(u => u.role === 'child') || data[0];
-        setCurrentUser(defaultUser);
-        
         const parentUser = data.find(u => u.role === 'parent');
         if (parentUser && parentUser.email) {
           setParentEmail(parentUser.email);
         }
+
       }
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -444,6 +455,20 @@ export default function App() {
     const interval = setInterval(checkAlarmTrigger, 3000);
     return () => clearInterval(interval);
   }, [medications, logs, activeAlarm, alarmAcknowledgedToday, currentUser]);
+
+  // Unanswered alarm auto-timeout (60 seconds) -> logs missed dose and triggers parent email alert
+  useEffect(() => {
+    if (!activeAlarm) return;
+    const timeoutId = setTimeout(() => {
+      console.warn(`⏰ Alarm unacknowledged for ${activeAlarm.name}. Auto-logging as missed and sending email alert to parent...`);
+      stopAlarmSound();
+      handleLogAdherence(activeAlarm.id, 'missed', 0, "Unanswered alarm - child did not respond");
+      setActiveAlarm(null);
+    }, 60000); // 60 seconds timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [activeAlarm]);
+
 
   // Scroll Chat to bottom
   useEffect(() => {
@@ -908,11 +933,15 @@ export default function App() {
             </span>
             <button 
               onClick={() => {
+                localStorage.removeItem("aegis_current_user");
+                localStorage.removeItem("aegis_is_logged_in");
+                setCurrentUser(null);
                 setIsLoggedIn(false);
                 setOtpSent(false);
                 setLoginOtp("");
                 setLoginError("");
               }}
+
               style={{
                 background: 'rgba(239, 68, 68, 0.15)',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
