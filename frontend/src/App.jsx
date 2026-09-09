@@ -144,6 +144,7 @@ export default function App() {
     return localStorage.getItem("aegis_is_logged_in") === "true";
   });
 
+  const [authTab, setAuthTab] = useState("login"); // 'login' or 'signup'
   const [loginName, setLoginName] = useState("");
   const [loginAge, setLoginAge] = useState("");
   const [loginPhone, setLoginPhone] = useState("");
@@ -181,7 +182,9 @@ export default function App() {
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
-    if (!loginOtp || !loginName || !loginAge || !loginPhone) return;
+    if (!loginOtp || !loginEmail) return;
+    if (authTab === 'signup' && (!loginName || !loginAge || !loginPhone)) return;
+    
     setIsVerifyingOtp(true);
     setLoginError("");
     try {
@@ -191,9 +194,9 @@ export default function App() {
         body: JSON.stringify({
           email: loginEmail,
           otp_code: loginOtp,
-          username: loginName,
-          age: Number(loginAge),
-          phone: loginPhone,
+          username: authTab === 'signup' ? loginName : undefined,
+          age: authTab === 'signup' && loginAge ? Number(loginAge) : undefined,
+          phone: authTab === 'signup' ? loginPhone : undefined,
           role: loginRole,
           parent_id: loginRole === 'child' ? 1 : null
         })
@@ -218,6 +221,7 @@ export default function App() {
       setIsVerifyingOtp(false);
     }
   };
+
 
 
   // Helper date strings
@@ -779,79 +783,182 @@ export default function App() {
           )}
 
           {!otpSent ? (
-            <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="form-group">
-                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Full Name</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="e.g. John Doe"
-                  value={loginName}
-                  onChange={(e) => setLoginName(e.target.value)}
-                  required
-                />
+            <div>
+              {/* Dual Tab Switcher: Log In vs Sign Up */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.04)', padding: '0.35rem', borderRadius: '14px', marginBottom: '1.5rem', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <button
+                  type="button"
+                  onClick={() => { setAuthTab('login'); setLoginError(""); }}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    fontWeight: '700',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    background: authTab === 'login' ? 'linear-gradient(135deg, #0ea5e9, #0284c7)' : 'transparent',
+                    color: authTab === 'login' ? '#fff' : '#94a3b8',
+                    boxShadow: authTab === 'login' ? '0 4px 12px rgba(14, 165, 233, 0.3)' : 'none'
+                  }}
+                >
+                  🔑 Log In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthTab('signup'); setLoginError(""); }}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    fontWeight: '700',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    background: authTab === 'signup' ? 'linear-gradient(135deg, #0ea5e9, #0284c7)' : 'transparent',
+                    color: authTab === 'signup' ? '#fff' : '#94a3b8',
+                    boxShadow: authTab === 'signup' ? '0 4px 12px rgba(14, 165, 233, 0.3)' : 'none'
+                  }}
+                >
+                  📝 Sign Up
+                </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Age</label>
-                  <input 
-                    type="number" 
-                    className="form-control" 
-                    placeholder="e.g. 35"
-                    value={loginAge}
-                    onChange={(e) => setLoginAge(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Role</label>
-                  <select 
-                    className="form-control" 
-                    value={loginRole} 
-                    onChange={(e) => setLoginRole(e.target.value)}
-                    style={{ background: '#121826', border: '1px solid rgba(255, 255, 255, 0.08)', color: '#fff' }}
+              {/* TAB 1: Log In (Existing Users) */}
+              {authTab === 'login' ? (
+                <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Registered Email ID</label>
+                    <input 
+                      type="email" 
+                      className="form-control" 
+                      placeholder="e.g. yourname@gmail.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* Quick Select from existing household profiles */}
+                  {users.filter(u => u.email).length > 0 && (
+                    <div style={{ marginTop: '-0.25rem' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
+                        Quick Select Saved Profile:
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {users.filter(u => u.email).map((u, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setLoginEmail(u.email);
+                              setLoginRole(u.role || 'parent');
+                            }}
+                            style={{
+                              background: loginEmail === u.email ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                              border: loginEmail === u.email ? '1px solid #0ea5e9' : '1px solid rgba(255, 255, 255, 0.1)',
+                              color: loginEmail === u.email ? '#38bdf8' : '#cbd5e1',
+                              borderRadius: '20px',
+                              padding: '0.25rem 0.65rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {u.role === 'parent' ? '👨‍👩‍👦' : '👶'} {u.username}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    disabled={isSendingOtp}
+                    style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}
                   >
-                    <option value="parent">Parent</option>
-                    <option value="child">Child</option>
-                  </select>
-                </div>
-              </div>
+                    {isSendingOtp ? "Sending OTP..." : "Send Log In OTP"}
+                  </button>
+                </form>
+              ) : (
+                /* TAB 2: Sign Up (New Account) */
+                <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Full Name</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. John Doe"
+                      value={loginName}
+                      onChange={(e) => setLoginName(e.target.value)}
+                      required
+                    />
+                  </div>
 
-              <div className="form-group">
-                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Phone Number</label>
-                <input 
-                  type="tel" 
-                  className="form-control" 
-                  placeholder="e.g. +91 9876543210"
-                  value={loginPhone}
-                  onChange={(e) => setLoginPhone(e.target.value)}
-                  required
-                />
-              </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group">
+                      <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Age</label>
+                      <input 
+                        type="number" 
+                        className="form-control" 
+                        placeholder="e.g. 35"
+                        value={loginAge}
+                        onChange={(e) => setLoginAge(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Role</label>
+                      <select 
+                        className="form-control" 
+                        value={loginRole} 
+                        onChange={(e) => setLoginRole(e.target.value)}
+                        style={{ background: '#121826', border: '1px solid rgba(255, 255, 255, 0.08)', color: '#fff' }}
+                      >
+                        <option value="parent">Parent</option>
+                        <option value="child">Child</option>
+                      </select>
+                    </div>
+                  </div>
 
-              <div className="form-group">
-                <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Email ID</label>
-                <input 
-                  type="email" 
-                  className="form-control" 
-                  placeholder="e.g. user@gmail.com"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  required
-                />
-              </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Phone Number</label>
+                    <input 
+                      type="tel" 
+                      className="form-control" 
+                      placeholder="e.g. +91 9876543210"
+                      value={loginPhone}
+                      onChange={(e) => setLoginPhone(e.target.value)}
+                      required
+                    />
+                  </div>
 
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                disabled={isSendingOtp}
-                style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}
-              >
-                {isSendingOtp ? "Sending OTP..." : "Send Verification OTP"}
-              </button>
-            </form>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Email ID</label>
+                    <input 
+                      type="email" 
+                      className="form-control" 
+                      placeholder="e.g. user@gmail.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    disabled={isSendingOtp}
+                    style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}
+                  >
+                    {isSendingOtp ? "Sending OTP..." : "Create Account & Send OTP"}
+                  </button>
+                </form>
+              )}
+            </div>
           ) : (
+
             <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.15)', color: '#38bdf8', padding: '0.75rem 1rem', borderRadius: '12px', fontSize: '0.82rem', textAlign: 'center', lineHeight: '1.4' }}>
                 📧 An OTP verification code was sent to <strong style={{ color: '#fff' }}>{loginEmail}</strong>. Please enter the code below to complete sign in.

@@ -268,11 +268,12 @@ class SendOtpRequest(BaseModel):
 class VerifyOtpRequest(BaseModel):
     email: str
     otp_code: str
-    username: str
-    age: int
-    phone: str
-    role: str                       # 'parent' or 'child'
+    username: Optional[str] = None
+    age: Optional[int] = None
+    phone: Optional[str] = None
+    role: Optional[str] = None                       # 'parent' or 'child'
     parent_id: Optional[int] = None
+
 
 
 class MedicationCreate(BaseModel):
@@ -433,12 +434,19 @@ def verify_otp(req: VerifyOtpRequest):
                 family_id = f"FAM-{secrets.token_hex(4).upper()}"
 
     try:
-        # Valid OTP! Update user details (complete sign-up/login)
+        # Valid OTP! If registration details are supplied (Sign Up), update them. Otherwise preserve existing profile (Log In).
+        new_username = req.username if req.username else user["username"]
+        new_age = req.age if req.age is not None else user["age"]
+        new_phone = req.phone if req.phone else user["phone"]
+        new_role = req.role if req.role else (user["role"] or "parent")
+        new_parent_id = req.parent_id if req.parent_id is not None else user["parent_id"]
+
         cursor.execute(
             "UPDATE users SET username = ?, age = ?, phone = ?, role = ?, parent_id = ?, family_id = ?, otp_code = NULL, otp_expiry = NULL WHERE id = ?",
-            (req.username, req.age, req.phone, req.role, req.parent_id, family_id, user["id"])
+            (new_username, new_age, new_phone, new_role, new_parent_id, family_id, user["id"])
         )
         conn.commit()
+
     except sqlite3.IntegrityError:
         conn.close()
         raise HTTPException(status_code=400, detail="This name is already taken. Please enter a different name.")
