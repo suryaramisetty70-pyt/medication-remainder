@@ -350,10 +350,14 @@ def send_otp(req: SendOtpRequest):
     # Print to console logs as fallback so developer can see it in terminal
     print(f"\n[MOCK OTP SERVICE] Verification OTP code for {req.email} is: {otp}\n")
 
-    # Send email containing the OTP synchronously to catch connection/config errors immediately
-    send_alert_email(req.email, "[Aegis AI] Your OTP Verification Code", email_body)
+    # Send email containing the OTP asynchronously in a background thread so the HTTP response is instantaneous (<0.1s)
+    threading.Thread(
+        target=send_alert_email,
+        args=(req.email, "[Aegis AI] Your OTP Verification Code", email_body)
+    ).start()
     
     return {"message": "OTP sent successfully to your email."}
+
 
 
 
