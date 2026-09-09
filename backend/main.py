@@ -31,14 +31,15 @@ import threading
 
 def send_alert_email(to_email: str, subject: str, body: str):
     smtp_server = "smtp.gmail.com"
-    sender = os.getenv("SMTP_SENDER", "suryaramisetty70@gmail.com")
-    password = os.getenv("SMTP_PASSWORD", "ykqa kpvp nlnw swhk")
+    sender = (os.getenv("SMTP_SENDER") or "suryaramisetty70@gmail.com").strip()
+    password = (os.getenv("SMTP_PASSWORD") or "ykqakpvpnlnwswhk").strip().replace(" ", "")
     
     if not sender or not password:
         raise HTTPException(
             status_code=500,
             detail="SMTP credentials are not configured. Please set SMTP_SENDER and SMTP_PASSWORD."
         )
+
         
     msg = MIMEMultipart()
     msg['From'] = sender
