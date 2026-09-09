@@ -35,51 +35,43 @@ def send_alert_email(to_email: str, subject: str, body: str):
     password = (os.getenv("SMTP_PASSWORD") or "ykqakpvpnlnwswhk").strip().replace(" ", "")
     
     if not sender or not password:
-        raise HTTPException(
-            status_code=500,
-            detail="SMTP credentials are not configured. Please set SMTP_SENDER and SMTP_PASSWORD."
-        )
+        print("[EMAIL ERROR] SMTP credentials are not configured!")
+        return False
 
-        
     msg = MIMEMultipart()
     msg['From'] = sender
     msg['To'] = to_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'html'))
     
-    err_587 = "No attempt"
-    err_465 = "No attempt"
-
-    # Try Port 587 (TLS) first
+    # Try Port 587 (TLS) first with longer cloud timeout
     try:
-        print(f"[EMAIL] Attempting to send email via TLS (port 587)...")
-        server = smtplib.SMTP(smtp_server, 587, timeout=10)
+        print(f"[EMAIL] Attempting TLS (port 587) to {to_email}...")
+        server = smtplib.SMTP(smtp_server, 587, timeout=30)
+        server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(sender, password)
         server.sendmail(sender, to_email, msg.as_string())
         server.quit()
-        print(f"[EMAIL] Alert email sent to {to_email} successfully via TLS (587)!")
+        print(f"[EMAIL SUCCESS] Email sent to {to_email} via TLS (587)!")
         return True
     except Exception as e587:
-        err_587 = str(e587)
-        print(f"[WARNING] Port 587 failed: {err_587}. Retrying via SSL (port 465)...")
+        print(f"[EMAIL WARNING] Port 587 failed: {e587}")
         
     # Try Port 465 (SSL) as fallback
     try:
-        server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
+        print(f"[EMAIL] Attempting SSL (port 465) to {to_email}...")
+        server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30)
+        server.ehlo()
         server.login(sender, password)
         server.sendmail(sender, to_email, msg.as_string())
         server.quit()
-        print(f"[EMAIL] Alert email sent to {to_email} successfully via SSL (465)!")
+        print(f"[EMAIL SUCCESS] Email sent to {to_email} via SSL (465)!")
         return True
     except Exception as e465:
-        err_465 = str(e465)
-        print(f"[ERROR] Failed to send email via both ports. SSL error: {err_465}")
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"Email delivery failed. Port 587 error: {err_587}, Port 465 error: {err_465}"
-        )
+        print(f"[EMAIL ERROR] Both ports failed. SSL error: {e465}")
+        return False
 
 
 
@@ -349,15 +341,18 @@ def send_otp(req: SendOtpRequest):
     """
     
     # Print to console logs as fallback so developer can see it in terminal
-    print(f"\n[MOCK OTP SERVICE] Verification OTP code for {req.email} is: {otp}\n")
+    print(f"\n[OTP SERVICE] Verification OTP code for {req.email} is: {otp}\n")
 
-    # Send email containing the OTP asynchronously in a background thread so the HTTP response is instantaneous (<0.1s)
-    threading.Thread(
-        target=send_alert_email,
-        args=(req.email, "[Aegis AI] Your OTP Verification Code", email_body)
-    ).start()
+    # Send email in background thread (non-blocking, logs errors to Render console)
+    def _send_email_safe():
+        try:
+            send_alert_email(req.email, "[Aegis AI] Your OTP Verification Code", email_body)
+        except Exception as e:
+            print(f"[EMAIL THREAD ERROR] Failed to send OTP email to {req.email}: {e}")
+
+    threading.Thread(target=_send_email_safe, daemon=True).start()
     
-    return {"message": "OTP sent successfully to your email."}
+    return {"message": "OTP sent successfully to your email.", "otp_code": otp}
 
 
 

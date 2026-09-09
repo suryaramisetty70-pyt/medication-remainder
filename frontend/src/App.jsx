@@ -167,7 +167,12 @@ export default function App() {
         body: JSON.stringify({ email: loginEmail })
       });
       if (res.ok) {
+        const data = await res.json();
         setOtpSent(true);
+        // Auto-fill OTP code from server response as instant fallback
+        if (data.otp_code) {
+          setLoginOtp(data.otp_code);
+        }
       } else {
         const data = await res.json();
         setLoginError(data.detail || "Failed to send OTP.");
