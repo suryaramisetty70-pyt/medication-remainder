@@ -871,6 +871,12 @@ export default function App() {
                 />
               </div>
 
+
+              <div style={{ textAlign: 'center', margin: '0.5rem 0 1rem 0', fontSize: '0.8rem', color: '#94a3b8', background: 'rgba(14, 165, 233, 0.08)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid rgba(14, 165, 233, 0.2)' }}>
+                💡 Fast-Track Test Code: <span onClick={() => setLoginOtp("123456")} style={{ color: '#38bdf8', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline', letterSpacing: '1px' }}>123456</span> <span style={{ fontSize: '0.72rem', color: '#64748b' }}>(click to auto-fill)</span>
+              </div>
+
+
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button 
                   type="button" 
