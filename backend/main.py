@@ -16,13 +16,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    print("Gemini API configured successfully.")
+    print("[AI] Gemini API configured successfully.")
 else:
-    print("WARNING: GEMINI_API_KEY not found in environment. Running in Mock AI mode.")
+    print("[AI WARNING] GEMINI_API_KEY not found. Running in Mock AI mode.")
+
 
 import smtplib
 from email.mime.text import MIMEText
@@ -47,7 +47,7 @@ def send_alert_email(to_email: str, subject: str, body: str):
     # Try Port 587 (TLS) first with longer cloud timeout
     try:
         print(f"[EMAIL] Attempting TLS (port 587) to {to_email}...")
-        server = smtplib.SMTP(smtp_server, 587, timeout=30)
+        server = smtplib.SMTP(smtp_server, 587, timeout=120)
         server.ehlo()
         server.starttls()
         server.ehlo()
@@ -62,7 +62,7 @@ def send_alert_email(to_email: str, subject: str, body: str):
     # Try Port 465 (SSL) as fallback
     try:
         print(f"[EMAIL] Attempting SSL (port 465) to {to_email}...")
-        server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30)
+        server = smtplib.SMTP_SSL(smtp_server, 465, timeout=120)
         server.ehlo()
         server.login(sender, password)
         server.sendmail(sender, to_email, msg.as_string())
@@ -350,9 +350,9 @@ def send_otp(req: SendOtpRequest):
         except Exception as e:
             print(f"[EMAIL THREAD ERROR] Failed to send OTP email to {req.email}: {e}")
 
-    threading.Thread(target=_send_email_safe, daemon=True).start()
+    threading.Thread(target=_send_email_safe, daemon=False).start()
     
-    return {"message": "OTP sent successfully to your email.", "otp_code": otp}
+    return {"message": "OTP sent successfully to your email."}
 
 
 
