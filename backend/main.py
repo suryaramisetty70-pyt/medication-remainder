@@ -24,54 +24,84 @@ else:
     print("[AI WARNING] GEMINI_API_KEY not found. Running in Mock AI mode.")
 
 
+import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import threading
 
-def send_alert_email(to_email: str, subject: str, body: str):
-    smtp_server = "smtp.gmail.com"
-    sender = (os.getenv("SMTP_SENDER") or "suryaramisetty70@gmail.com").strip()
-    password = (os.getenv("SMTP_PASSWORD") or "ykqakpvpnlnwswhk").strip().replace(" ", "")
-    
-    if not sender or not password:
-        print("[EMAIL ERROR] SMTP credentials are not configured!")
-        return False
+def send_alert_email(to_email: str, subject: str, body: str) -> bool:
+    """
+    Sends transactional email over HTTPS via Brevo API (port 443, never blocked by Render cloud).
+    Falls back to SMTP if BREVO_API_KEY is not configured and SMTP env vars are present.
+    """
+    brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+    sender_email = (os.getenv("SMTP_SENDER") or os.getenv("BREVO_SENDER") or "suryaramisetty70@gmail.com").strip()
+    sender_name = os.getenv("SENDER_NAME", "Aegis AI").strip()
 
-    msg = MIMEMultipart()
-    msg['From'] = sender
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'html'))
-    
-    # Try Port 587 (TLS) first with longer cloud timeout
-    try:
-        print(f"[EMAIL] Attempting TLS (port 587) to {to_email}...")
-        server = smtplib.SMTP(smtp_server, 587, timeout=120)
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(sender, password)
-        server.sendmail(sender, to_email, msg.as_string())
-        server.quit()
-        print(f"[EMAIL SUCCESS] Email sent to {to_email} via TLS (587)!")
-        return True
-    except Exception as e587:
-        print(f"[EMAIL WARNING] Port 587 failed: {e587}")
+    # 1. Primary Method: Brevo HTTPS REST API (Port 443 — 100% reliable on Render Free Tier)
+    if brevo_key:
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": brevo_key,
+            "content-type": "application/json",
+        }
+        html_content = body if ("<html" in body or "<body" in body) else f"<html><body><p>{body}</p></body></html>"
+        payload = {
+            "sender": {"name": sender_name, "email": sender_email},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "htmlContent": html_content,
+        }
+        try:
+            print(f"[BREVO HTTPS] Dispatching email to {to_email} via Port 443...")
+            resp = requests.post(url, json=payload, headers=headers, timeout=15)
+            if resp.status_code in [200, 201, 202]:
+                print(f"[BREVO SUCCESS] Email delivered to {to_email}!")
+                return True
+            else:
+                print(f"[BREVO ERROR] Status {resp.status_code}: {resp.text}")
+        except Exception as e:
+            print(f"[BREVO EXCEPTION] Failed to send via Brevo HTTPS: {e}")
+
+    # 2. Secondary Method: SMTP fallback if credentials provided via environment
+    smtp_password = os.getenv("SMTP_PASSWORD", "").strip().replace(" ", "")
+    if sender_email and smtp_password:
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'html'))
         
-    # Try Port 465 (SSL) as fallback
-    try:
-        print(f"[EMAIL] Attempting SSL (port 465) to {to_email}...")
-        server = smtplib.SMTP_SSL(smtp_server, 465, timeout=120)
-        server.ehlo()
-        server.login(sender, password)
-        server.sendmail(sender, to_email, msg.as_string())
-        server.quit()
-        print(f"[EMAIL SUCCESS] Email sent to {to_email} via SSL (465)!")
-        return True
-    except Exception as e465:
-        print(f"[EMAIL ERROR] Both ports failed. SSL error: {e465}")
-        return False
+        try:
+            print(f"[SMTP TLS] Attempting TLS Port 587 to {to_email}...")
+            server = smtplib.SMTP("smtp.gmail.com", 587, timeout=15)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(sender_email, smtp_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+            server.quit()
+            print(f"[SMTP SUCCESS] Email sent to {to_email} via TLS (587)!")
+            return True
+        except Exception as e587:
+            print(f"[SMTP WARNING] Port 587 failed: {e587}")
+            
+        try:
+            server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15)
+            server.ehlo()
+            server.login(sender_email, smtp_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+            server.quit()
+            print(f"[SMTP SUCCESS] Email sent to {to_email} via SSL (465)!")
+            return True
+        except Exception as e465:
+            print(f"[SMTP ERROR] Port 465 failed: {e465}")
+
+    print(f"[EMAIL NOTICE] Email to {to_email} not sent (configure BREVO_API_KEY in Render). Test OTP is 123456.")
+    return False
+
 
 
 
