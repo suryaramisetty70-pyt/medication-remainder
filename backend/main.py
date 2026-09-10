@@ -273,6 +273,8 @@ class VerifyOtpRequest(BaseModel):
     phone: Optional[str] = None
     role: Optional[str] = None                       # 'parent' or 'child'
     parent_id: Optional[int] = None
+    family_code: Optional[str] = None
+
 
 
 
@@ -418,7 +420,9 @@ def verify_otp(req: VerifyOtpRequest):
         
     # Resolve or generate family_id
     family_id = user["family_id"]
-    if not family_id or family_id == 'FAM-DEFAULT':
+    if req.family_code and req.family_code.strip():
+        family_id = req.family_code.strip().upper()
+    elif not family_id or family_id == 'FAM-DEFAULT':
         if req.role == 'parent':
             # Generate a new family code
             import secrets
@@ -432,6 +436,7 @@ def verify_otp(req: VerifyOtpRequest):
             else:
                 import secrets
                 family_id = f"FAM-{secrets.token_hex(4).upper()}"
+
 
     try:
         # Valid OTP! If registration details are supplied (Sign Up), update them. Otherwise preserve existing profile (Log In).

@@ -150,6 +150,7 @@ export default function App() {
   const [loginPhone, setLoginPhone] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginRole, setLoginRole] = useState("parent");
+  const [loginFamilyCode, setLoginFamilyCode] = useState("");
   const [loginOtp, setLoginOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -198,9 +199,11 @@ export default function App() {
           age: authTab === 'signup' && loginAge ? Number(loginAge) : undefined,
           phone: authTab === 'signup' ? loginPhone : undefined,
           role: loginRole,
-          parent_id: loginRole === 'child' ? 1 : null
+          parent_id: loginRole === 'child' ? 1 : null,
+          family_code: authTab === 'signup' && loginRole === 'child' && loginFamilyCode ? loginFamilyCode : undefined
         })
       });
+
       if (res.ok) {
         const user = await res.json();
         setCurrentUser(user);
@@ -922,6 +925,23 @@ export default function App() {
                     </div>
                   </div>
 
+                  {loginRole === 'child' && (
+                    <div className="form-group" style={{ background: 'rgba(56, 189, 248, 0.08)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#38bdf8' }}>🔑 Family Code (from Parent)</label>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="e.g. FAM-8X2K (Optional)"
+                        value={loginFamilyCode}
+                        onChange={(e) => setLoginFamilyCode(e.target.value.toUpperCase())}
+                        style={{ textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' }}
+                      />
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem', display: 'block' }}>
+                        Enter the Family Code shown on your Parent's dashboard to link your schedule.
+                      </span>
+                    </div>
+                  )}
+
                   <div className="form-group">
                     <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Phone Number</label>
                     <input 
@@ -945,6 +965,7 @@ export default function App() {
                       required
                     />
                   </div>
+
 
                   <button 
                     type="submit" 
@@ -1146,31 +1167,108 @@ export default function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
           {/* Add Medication Form (Parent only) / Welcoming Guide (Child only) */}
+          {/* Add Medication Form (Parent only) / Welcoming Guide with Live Countdown (Child only) */}
           {currentUser?.role === 'child' ? (
             <div className="glass-card" style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.15)' }}>
               <h3 className="card-title" style={{ color: 'var(--color-accent)' }}><Sparkles size={18} /> Child Adherence Guide</h3>
               <p style={{ fontSize: '0.9rem', lineHeight: '1.4', color: 'var(--text-secondary)' }}>
                 Welcome back! Please review your daily medication checklist on the right. 
               </p>
+              
+              {/* Next Dose Countdown Badge */}
+              {(() => {
+                const now = new Date();
+                const currentMins = now.getHours() * 60 + now.getMinutes();
+                let nextMed = null;
+                let minDiff = 999999;
+                
+                medications.forEach(m => {
+                  const parts = (m.schedule_time || "").split(':');
+                  if (parts.length === 2) {
+                    const medMins = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+                    let diff = medMins - currentMins;
+                    if (diff < 0) diff += 1440;
+                    if (diff < minDiff) {
+                      minDiff = diff;
+                      nextMed = { ...m, diffMins: diff };
+                    }
+                  }
+                });
+
+                if (!nextMed) return null;
+                const hours = Math.floor(nextMed.diffMins / 60);
+                const mins = nextMed.diffMins % 60;
+                const timeLabel = nextMed.diffMins === 0 ? "Due Right Now!" : `${hours > 0 ? `${hours}h ` : ''}${mins}m`;
+
+                return (
+                  <div style={{ marginTop: '0.85rem', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '0.65rem 1rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#fff' }}>
+                      ⏰ Next Dose: <strong>{nextMed.name}</strong> ({nextMed.dosage})
+                    </span>
+                    <span style={{ fontSize: '0.82rem', color: '#38bdf8', fontWeight: '700', letterSpacing: '0.5px' }}>
+                      {timeLabel}
+                    </span>
+                  </div>
+                );
+              })()}
+
               <div style={{ marginTop: '1rem', background: 'rgba(0, 0, 0, 0.2)', padding: '0.75rem', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                 🔔 <strong>How it works:</strong> The alarm will ring automatically when it is time to take your pill. Tapping <strong>Stop Alarm</strong> opens the camera automatically. Simply scan the pill to report to your parent!
               </div>
             </div>
           ) : (
-            <div className="glass-card">
-              <h3 className="card-title"><Plus size={18} /> Schedule Medication</h3>
-              <form onSubmit={handleAddMedication}>
-                <div className="form-group">
-                  <label>Medication Name</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="e.g. Lipitor, Metformin" 
-                    value={newMedName}
-                    onChange={(e) => setNewMedName(e.target.value)}
-                    required
-                  />
+            <>
+              {/* Household Family Code Card for Parent */}
+              <div className="glass-card" style={{ background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(2, 132, 199, 0.05))', border: '1px solid rgba(14, 165, 233, 0.3)', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '800' }}>
+                      👨‍👩‍👧 Household Family Code
+                    </span>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#38bdf8', letterSpacing: '2px', marginTop: '0.2rem' }}>
+                      {currentUser?.family_id || 'FAM-DEFAULT'}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      Share this code with your child during sign-up so their app links to this schedule.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(currentUser?.family_id || 'FAM-DEFAULT');
+                      alert(`Copied Family Code: ${currentUser?.family_id || 'FAM-DEFAULT'}`);
+                    }}
+                    style={{
+                      background: 'rgba(14, 165, 233, 0.25)',
+                      border: '1px solid #0ea5e9',
+                      color: '#38bdf8',
+                      borderRadius: '10px',
+                      padding: '0.45rem 0.9rem',
+                      fontSize: '0.82rem',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📋 Copy Code
+                  </button>
                 </div>
+              </div>
+
+              <div className="glass-card">
+                <h3 className="card-title"><Plus size={18} /> Schedule Medication</h3>
+                <form onSubmit={handleAddMedication}>
+                  <div className="form-group">
+                    <label>Medication Name</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. Lipitor, Metformin" 
+                      value={newMedName}
+                      onChange={(e) => setNewMedName(e.target.value)}
+                      required
+                    />
+                  </div>
+
 
                 <div className="form-group">
                   <label>Dosage</label>
@@ -1211,7 +1309,9 @@ export default function App() {
                 </button>
               </form>
             </div>
+            </>
           )}
+
 
           {/* Parent Alert Email Configuration Card */}
           {currentUser?.role === 'parent' && (
