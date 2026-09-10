@@ -275,6 +275,13 @@ class VerifyOtpRequest(BaseModel):
     parent_id: Optional[int] = None
     family_code: Optional[str] = None
 
+class DirectLoginRequest(BaseModel):
+    email: str
+    username: Optional[str] = None
+    role: Optional[str] = "parent"
+    family_code: Optional[str] = None
+
+
 
 
 
@@ -390,7 +397,53 @@ def send_otp(req: SendOtpRequest):
 
 
 
+@app.post("/api/auth/direct-login", response_model=UserResponse)
+def direct_login(req: DirectLoginRequest):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    clean_email = req.email.strip().lower()
+    cursor.execute("SELECT * FROM users WHERE LOWER(email) = ?", (clean_email,))
+    user = cursor.fetchone()
+    
+    if user:
+        # Existing user - update username if provided
+        if req.username and req.username.strip():
+            cursor.execute("UPDATE users SET username = ? WHERE id = ?", (req.username.strip(), user["id"]))
+            conn.commit()
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user["id"],))
+            user = cursor.fetchone()
+    else:
+        # New direct login user
+        username = req.username.strip() if (req.username and req.username.strip()) else clean_email.split("@")[0]
+        role = req.role or "parent"
+        
+        # Family code resolution
+        if req.family_code and req.family_code.strip():
+            family_id = req.family_code.strip().upper()
+        elif role == 'parent':
+            import secrets
+            family_id = f"FAM-{secrets.token_hex(4).upper()}"
+        else:
+            cursor.execute("SELECT family_id FROM users WHERE role = 'parent' AND family_id IS NOT NULL AND family_id != 'FAM-DEFAULT' LIMIT 1")
+            row = cursor.fetchone()
+            family_id = row["family_id"] if row else "FAM-DEFAULT"
+            
+        cursor.execute(
+            "INSERT INTO users (username, email, role, family_id) VALUES (?, ?, ?, ?)",
+            (username, clean_email, role, family_id)
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+    conn.close()
+    return dict(user)
+
+
 @app.post("/api/auth/verify-otp", response_model=UserResponse)
+
 def verify_otp(req: VerifyOtpRequest):
     from datetime import datetime
     

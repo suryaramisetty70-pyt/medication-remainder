@@ -157,6 +157,42 @@ export default function App() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
+  const handleDirectLogin = async (e) => {
+    e.preventDefault();
+    if (!loginEmail) return;
+    setIsSendingOtp(true);
+    setLoginError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/direct-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: loginEmail,
+          username: loginName || undefined,
+          role: loginRole || "parent"
+        })
+      });
+      if (res.ok) {
+        const user = await res.json();
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+        try {
+          localStorage.setItem("aegis_current_user", JSON.stringify(user));
+          localStorage.setItem("aegis_is_logged_in", "true");
+        } catch(e) {}
+        handleUnlockAudio();
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        setLoginError(data.detail || "Login failed. Please check your details.");
+      }
+    } catch (err) {
+      setLoginError("Connection error. Please check your internet.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
   const handleSendOtp = async (e) => {
     e.preventDefault();
     if (!loginEmail) return;
@@ -180,6 +216,7 @@ export default function App() {
       setIsSendingOtp(false);
     }
   };
+
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
@@ -827,15 +864,26 @@ export default function App() {
                 </button>
               </div>
 
-              {/* TAB 1: Log In (Existing Users) */}
+              {/* TAB 1: Log In (Existing Users - Instant 1-Click with Name & Email) */}
               {authTab === 'login' ? (
-                <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <form onSubmit={handleDirectLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Full Name / Username</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. Ram Royal, sai"
+                      value={loginName}
+                      onChange={(e) => setLoginName(e.target.value)}
+                    />
+                  </div>
+
                   <div className="form-group">
                     <label style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Registered Email ID</label>
                     <input 
                       type="email" 
                       className="form-control" 
-                      placeholder="e.g. yourname@gmail.com"
+                      placeholder="e.g. ramroyal353@gmail.com"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       required
@@ -854,6 +902,7 @@ export default function App() {
                             key={idx}
                             type="button"
                             onClick={() => {
+                              setLoginName(u.username);
                               setLoginEmail(u.email);
                               setLoginRole(u.role || 'parent');
                             }}
@@ -881,10 +930,11 @@ export default function App() {
                     disabled={isSendingOtp}
                     style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}
                   >
-                    {isSendingOtp ? "Sending OTP..." : "Send Log In OTP"}
+                    {isSendingOtp ? "Logging In..." : "🚀 Log In to Dashboard"}
                   </button>
                 </form>
               ) : (
+
                 /* TAB 2: Sign Up (New Account) */
                 <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   <div className="form-group">
@@ -1447,30 +1497,53 @@ export default function App() {
                           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Pending child action</span>
                         )
                       ) : (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          color: item.status === 'taken' ? 'var(--color-success)' : 'var(--color-danger)'
-                        }}>
-                          {item.status === 'taken' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
-                          <span style={{ textTransform: 'capitalize' }}>{item.status}</span>
-                          
-                          {currentUser?.role === 'child' && (
-                            <button 
-                              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '0.5rem' }}
-                              onClick={() => handleLogAdherence(item.id, 'pending')}
-                              title="Reset Log"
-                            >
-                              <X size={14} />
-                            </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-end' }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            color: item.status === 'taken' ? 'var(--color-success)' : 'var(--color-danger)'
+                          }}>
+                            {item.status === 'taken' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+                            <span style={{ textTransform: 'capitalize' }}>{item.status}</span>
+                            
+                            {currentUser?.role === 'child' && (
+                              <button 
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginLeft: '0.5rem' }}
+                                onClick={() => handleLogAdherence(item.id, 'pending')}
+                                title="Reset Log"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* If missed, provide instant option for child to still take medicine and upload pill scan */}
+                          {currentUser?.role === 'child' && item.status === 'missed' && (
+                            <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.2rem' }}>
+                              <button 
+                                className="btn-action btn-action-take" 
+                                onClick={() => handleLogAdherence(item.id, 'taken', 0, "Self-logged (Delayed)")}
+                                style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem' }}
+                              >
+                                Take Now
+                              </button>
+                              <button 
+                                className="btn-action btn-action-verify" 
+                                onClick={() => setSelectedMedForCamera(item)}
+                                style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}
+                              >
+                                <Camera size={12} /> Scan & Upload
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}
                     </div>
                   </div>
+
                 ))
               )}
             </div>
