@@ -1,0 +1,2057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CareSync — Family Medicine Reminder & Monitoring</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts & Phosphor Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+            70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+            100% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+        .pulse-alert { animation: pulse-ring 2s infinite; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col bg-slate-50">
+
+    <!-- TOP NAVIGATION -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="navigate('landing')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 to-brand-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                    <i class="ph-bold ph-heartbeat text-2xl"></i>
+                </div>
+                <div>
+                    <span class="text-xl font-extrabold text-slate-900 tracking-tight">Care<span class="text-brand-600">Sync</span></span>
+                    <span class="hidden sm:inline-block text-xs text-slate-400 font-medium ml-2 pl-2 border-l border-slate-200">Family Medicine Bridge</span>
+                </div>
+            </div>
+
+            <!-- Right Controls -->
+            <div class="flex items-center space-x-3">
+                <!-- Live Scheduler Indicator -->
+                <div class="hidden md:flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Live Background Engine</span>
+                </div>
+
+                <!-- Unauthenticated Nav -->
+                <div id="nav-unauth" class="flex items-center space-x-2">
+                    <button onclick="navigate('auth'); switchAuthTab('login');" class="px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-brand-600 transition">Sign In</button>
+                    <button onclick="navigate('auth'); switchAuthTab('signup');" class="px-3.5 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm transition">Create Account</button>
+                </div>
+
+                <!-- Authenticated Nav -->
+                <div id="nav-auth" class="hidden flex items-center space-x-3">
+                    <!-- Notifications Dropdown -->
+                    <div class="relative">
+                        <button onclick="toggleNotifications()" class="relative p-2 text-slate-600 hover:text-brand-600 rounded-lg hover:bg-slate-100 transition">
+                            <i class="ph-bold ph-bell text-xl"></i>
+                            <span id="notif-badge" class="hidden absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+                        </button>
+                        <!-- Notif Drawer -->
+                        <div id="notif-drawer" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 py-3 z-50">
+                            <div class="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                                <span class="text-xs font-bold text-slate-800 uppercase">Notifications</span>
+                                <button onclick="markAllNotificationsRead()" class="text-xs text-brand-600 font-semibold hover:underline">Mark all read</button>
+                            </div>
+                            <div id="notif-list" class="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                                <div class="p-4 text-center text-xs text-slate-400">No notifications</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Pill -->
+                    <div class="flex items-center space-x-2 bg-slate-100 py-1 px-3 rounded-full border border-slate-200">
+                        <div class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs font-bold" id="user-avatar-text">U</div>
+                        <div class="text-left hidden sm:block">
+                            <div class="text-xs font-bold text-slate-800 leading-tight" id="user-name-text">User</div>
+                            <span class="text-[10px] font-semibold text-brand-700 uppercase" id="user-role-badge">Role</span>
+                        </div>
+                    </div>
+
+                    <!-- Logout Button -->
+                    <button onclick="handleLogout()" title="Logout" class="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 transition">
+                        <i class="ph-bold ph-sign-out text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2"></div>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content" class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- ============================================== -->
+        <!-- 1. LANDING PAGE -->
+        <!-- ============================================== -->
+        <section id="view-landing" class="view-section py-6 sm:py-12 space-y-12">
+            <!-- Hero -->
+            <div class="text-center max-w-3xl mx-auto space-y-5">
+                <div class="inline-flex items-center space-x-2 bg-brand-50 border border-brand-200 px-4 py-1.5 rounded-full text-xs font-bold text-brand-700">
+                    <i class="ph-fill ph-shield-check"></i>
+                    <span>Healthcare-Grade Family Medicine Bridge</span>
+                </div>
+                <h1 class="text-4xl sm:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                    Never Miss the Moment <br><span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-teal-500">That Matters.</span>
+                </h1>
+                <p class="text-base sm:text-lg text-slate-600 leading-relaxed">
+                    CareSync bridges parents and children with scheduled medicine alarms, automated missed dose escalation, real email alerts, and photo proof verification.
+                </p>
+
+                <!-- Quick Action Buttons -->
+                <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    <button onclick="navigate('auth'); switchAuthTab('signup');" class="px-6 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-lg shadow-brand-500/25 transition text-sm flex items-center space-x-2">
+                        <span>Create Your Account</span>
+                        <i class="ph-bold ph-arrow-right"></i>
+                    </button>
+                    <button onclick="navigate('auth'); switchAuthTab('login');" class="px-6 py-3.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl font-bold transition text-sm">
+                        Sign In
+                    </button>
+                </div>
+
+                <!-- Live System Trust & Capability Badges -->
+                <div class="mt-8 p-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm max-w-2xl mx-auto text-left">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="flex items-center space-x-3 p-2">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <i class="ph-bold ph-envelope-simple text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-slate-800">Direct Email Alerts</div>
+                                <div class="text-[11px] text-slate-500">Real-time missed dose escalation</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3 p-2">
+                            <div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                                <i class="ph-bold ph-camera text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-slate-800">Photo Proof Intake</div>
+                                <div class="text-[11px] text-slate-500">Secure camera verification</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3 p-2">
+                            <div class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                <i class="ph-bold ph-shield-check text-lg"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-slate-800">100% Private & Live</div>
+                                <div class="text-[11px] text-slate-500">Encrypted relational storage</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Highlights -->
+            <div class="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-calendar-plus"></i></div>
+                    <h3 class="font-bold text-slate-800 text-sm">1. Parent Schedules</h3>
+                    <p class="text-xs text-slate-500 mt-1">Parent sets dosage, timing, and custom instructions for the child.</p>
+                </div>
+                <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-bell-ringing"></i></div>
+                    <h3 class="font-bold text-slate-800 text-sm">2. Child Reminder Alarm</h3>
+                    <p class="text-xs text-slate-500 mt-1">Child receives alarm chime and notification at scheduled medicine time.</p>
+                </div>
+                <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-camera"></i></div>
+                    <h3 class="font-bold text-slate-800 text-sm">3. Photo Proof Upload</h3>
+                    <p class="text-xs text-slate-500 mt-1">Child confirms dose and snaps photo proof stored securely in private storage.</p>
+                </div>
+                <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-warning-octagon"></i></div>
+                    <h3 class="font-bold text-slate-800 text-sm">4. Missed Dose Warning</h3>
+                    <p class="text-xs text-slate-500 mt-1">If unconfirmed past grace period, warning email and Call Child action trigger instantly.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- 2. AUTHENTICATION (SIGNUP & SIGNIN) -->
+        <!-- ============================================== -->
+        <section id="view-auth" class="view-section hidden max-w-md mx-auto py-8">
+            <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
+                <!-- Tabs -->
+                <div class="flex border-b border-slate-200 pb-2">
+                    <button id="tab-login-btn" onclick="switchAuthTab('login')" class="flex-1 pb-2 text-sm font-bold text-center border-b-2 border-brand-600 text-brand-600">Sign In</button>
+                    <button id="tab-signup-btn" onclick="switchAuthTab('signup')" class="flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600">Create Account</button>
+                    <button id="tab-joincode-btn" onclick="switchAuthTab('joincode')" class="flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600">Family Code</button>
+                </div>
+
+                <!-- SIGN IN FORM -->
+                <form id="form-login" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email Address</label>
+                        <input type="email" id="login-email" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="you@example.com">
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Password</label>
+                            <button type="button" onclick="openForgotPasswordModal()" class="text-xs text-brand-600 font-semibold hover:underline">Forgot password?</button>
+                        </div>
+                        <input type="password" id="login-password" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="••••••••">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="login-remember" checked class="w-4 h-4 text-brand-600 rounded border-slate-300">
+                        <label for="login-remember" class="ml-2 text-xs text-slate-600 font-medium">Keep me signed in</label>
+                    </div>
+                    <button type="submit" class="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-md shadow-brand-500/20 transition flex items-center justify-center space-x-2">
+                        <span>Sign In</span>
+                        <i class="ph-bold ph-sign-in"></i>
+                    </button>
+                </form>
+
+                <!-- SIGN UP FORM -->
+                <form id="form-signup" onsubmit="handleSignupSubmit(event)" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Select Role</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="signup-role" value="PARENT" checked class="peer sr-only">
+                                <div class="p-3 border-2 border-slate-200 peer-checked:border-brand-600 peer-checked:bg-brand-50/50 rounded-xl text-center text-xs font-bold text-slate-700 peer-checked:text-brand-700 transition">
+                                    👨‍👧 Parent
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="signup-role" value="CHILD" class="peer sr-only">
+                                <div class="p-3 border-2 border-slate-200 peer-checked:border-brand-600 peer-checked:bg-brand-50/50 rounded-xl text-center text-xs font-bold text-slate-700 peer-checked:text-brand-700 transition">
+                                    📱 Child
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Full Name</label>
+                        <input type="text" id="signup-name" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="e.g. Sunil Sharma">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email Address</label>
+                        <input type="email" id="signup-email" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="name@domain.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Phone Number (For Emergency Calls)</label>
+                        <input type="tel" id="signup-phone" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="+91 98765 43210">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Password</label>
+                        <input type="password" id="signup-password" required oninput="checkPasswordStrength(this.value)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="Min 8 chars, 1 uppercase, 1 special">
+                        <div class="mt-2 text-[11px] text-slate-400 space-y-0.5">
+                            <div id="pwd-req-len">● 8+ characters</div>
+                            <div id="pwd-req-case">● 1 uppercase & 1 lowercase letter</div>
+                            <div id="pwd-req-num">● 1 number & 1 special character (!@#$%^&*)</div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Confirm Password</label>
+                        <input type="password" id="signup-confirm-password" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="Repeat password">
+                    </div>
+                    <button type="submit" class="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-md shadow-brand-500/20 transition flex items-center justify-center space-x-2">
+                        <span>Create Account</span>
+                        <i class="ph-bold ph-arrow-right"></i>
+                    </button>
+                </form>
+
+                <!-- JOIN WITH CODE FORM -->
+                <form id="form-joincode" onsubmit="handleJoinCodeSubmit(event)" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">6-Digit Family Code</label>
+                        <input type="text" id="join-code-input" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="e.g. CARE-A7B2">
+                    </div>
+                    <button type="submit" class="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-md shadow-brand-500/20 transition flex items-center justify-center space-x-2">
+                        <span>Join Now</span>
+                        <i class="ph-bold ph-arrow-right"></i>
+                    </button>
+                </form>
+
+            </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- 3. PARENT PORTAL -->
+        <!-- ============================================== -->
+        <section id="view-parent" class="view-section hidden space-y-6">
+            <!-- EMERGENCY ALERT EMAIL & VERIFICATION BAR -->
+            <div class="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200 rounded-3xl p-4 sm:p-5 mb-2 shadow-sm space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-md shadow-blue-500/20">
+                            <i class="ph-bold ph-envelope-simple"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-extrabold uppercase tracking-wider text-blue-900">Emergency Alert Notification Channel</h4>
+                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                    <i class="ph-bold ph-shield-check"></i> Active
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-blue-700 mt-0.5">Missed dose urgent warnings & photo proof submissions will be delivered to these email inboxes.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+                    <div class="relative flex-1 w-full">
+                        <input type="text" id="top-alert-email" class="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-2xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" placeholder="Primary email (or multiple comma-separated: mom@gmail.com, dad@gmail.com)">
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <button onclick="saveTopAlertEmail()" class="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-blue-500/20 transition flex items-center justify-center space-x-1.5">
+                            <i class="ph-bold ph-floppy-disk"></i>
+                            <span>Save Email(s)</span>
+                        </button>
+                        <button onclick="sendTestAlertEmail()" id="btn-test-alert-email" class="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-emerald-500/20 transition flex items-center justify-center space-x-1.5">
+                            <i class="ph-bold ph-paper-plane-tilt"></i>
+                            <span>🧪 Send Test Email</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="alert-email-feedback" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 hidden"></div>
+            </div>
+
+            <!-- Subheader Banner -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <div>
+                    <div class="text-xs font-bold uppercase tracking-wider text-brand-600">Caregiver Control Center</div>
+                    <h2 class="text-2xl font-extrabold text-slate-900" id="parent-greeting">Good day, Parent</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Live medication compliance and monitoring dashboard.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="openAddMedicineModal()" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center space-x-1.5">
+                        <i class="ph-bold ph-plus-circle text-base"></i>
+                        <span>Add Medicine</span>
+                    </button>
+                    <button onclick="openAddChildModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+                        <i class="ph-bold ph-user-plus text-base"></i>
+                        <span>Connect Child</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- URGENT MISSED DOSE ESCALATION BANNER -->
+            <div id="parent-missed-alert-banner" class="hidden p-5 bg-red-50 border-2 border-red-400 rounded-3xl shadow-lg pulse-alert">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center text-2xl flex-shrink-0">
+                            <i class="ph-bold ph-warning-octagon"></i>
+                        </div>
+                        <div>
+                            <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-200 text-red-900 uppercase">Emergency Missed Alert</div>
+                            <h3 class="text-base font-extrabold text-red-900 mt-1" id="missed-banner-title">Child Missed Scheduled Medicine</h3>
+                            <p class="text-xs text-red-700 mt-0.5" id="missed-banner-desc">Scheduled time + grace period elapsed without intake confirmation.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <a id="btn-call-child" href="tel:" class="px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-md shadow-red-500/30 flex items-center space-x-2 transition">
+                            <i class="ph-bold ph-phone-call text-lg"></i>
+                            <span id="btn-call-label">Call Child Now</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATS OVERVIEW CARDS -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-slate-400 uppercase">Today's Total</div>
+                    <div class="text-3xl font-extrabold text-slate-900 mt-1" id="stat-total">0</div>
+                    <div class="text-[11px] text-slate-500 mt-1">Prescribed doses</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-emerald-600 uppercase">Taken / Verified</div>
+                    <div class="text-3xl font-extrabold text-emerald-600 mt-1" id="stat-taken">0</div>
+                    <div class="text-[11px] text-slate-500 mt-1">Completed doses</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-amber-500 uppercase">Pending Due</div>
+                    <div class="text-3xl font-extrabold text-amber-500 mt-1" id="stat-pending">0</div>
+                    <div class="text-[11px] text-slate-500 mt-1">Awaiting intake</div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="text-xs font-bold text-red-600 uppercase">Missed Doses</div>
+                    <div class="text-3xl font-extrabold text-red-600 mt-1" id="stat-missed">0</div>
+                    <div class="text-[11px] text-slate-500 mt-1">Escalated alerts</div>
+                </div>
+            </div>
+
+            <!-- SUBTABS NAVIGATION -->
+            <div class="border-b border-slate-200 flex space-x-6 overflow-x-auto pb-1">
+                <button onclick="switchParentSubTab('schedule')" id="ptab-schedule-btn" class="pb-3 text-sm font-bold text-brand-600 border-b-2 border-brand-600 whitespace-nowrap">Today's Schedule</button>
+                <button onclick="switchParentSubTab('medicines')" id="ptab-medicines-btn" class="pb-3 text-sm font-bold text-slate-400 hover:text-slate-600 whitespace-nowrap">Prescriptions</button>
+                <button onclick="switchParentSubTab('children')" id="ptab-children-btn" class="pb-3 text-sm font-bold text-slate-400 hover:text-slate-600 whitespace-nowrap">Connected Family</button>
+                <button onclick="switchParentSubTab('history')" id="ptab-history-btn" class="pb-3 text-sm font-bold text-slate-400 hover:text-slate-600 whitespace-nowrap">Adherence History</button>
+                <button onclick="switchParentSubTab('settings')" id="ptab-settings-btn" class="pb-3 text-sm font-bold text-slate-400 hover:text-slate-600 whitespace-nowrap">Alert Settings</button>
+            </div>
+
+            <!-- SUBTAB 1: SCHEDULE -->
+            <div id="parent-tab-schedule" class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-base font-bold text-slate-900">Timeline & Verification Queue</h3>
+                    <button onclick="loadParentDashboard()" class="text-xs font-semibold text-brand-600 hover:underline flex items-center space-x-1">
+                        <i class="ph-bold ph-arrows-clockwise"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+                <div id="parent-schedule-list" class="space-y-3">
+                    <div class="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 text-sm">Loading schedule timeline...</div>
+                </div>
+            </div>
+
+            <!-- SUBTAB 2: PRESCRIPTIONS -->
+            <div id="parent-tab-medicines" class="space-y-4 hidden">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-base font-bold text-slate-900">Active Prescriptions</h3>
+                    <button onclick="openAddMedicineModal()" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-bold">+ New Medicine</button>
+                </div>
+                <div id="parent-medicines-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 text-sm col-span-2">Loading prescriptions...</div>
+                </div>
+            </div>
+
+            <!-- SUBTAB 3: CONNECTED CHILDREN -->
+            <div id="parent-tab-children" class="space-y-4 hidden">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-base font-bold text-slate-900">Family Bridge (Connected Children)</h3>
+                    <button onclick="openAddChildModal()" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-bold">+ Invite Child</button>
+                </div>
+                <div id="parent-children-list" class="space-y-3">
+                    <div class="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 text-sm">Loading connected children...</div>
+                </div>
+            </div>
+
+            <!-- SUBTAB 4: ADHERENCE HISTORY -->
+            <div id="parent-tab-history" class="space-y-4 hidden">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-base font-bold text-slate-900">Historical Dose Logs</h3>
+                </div>
+                <div id="parent-history-list" class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                    <div class="p-6 text-center text-slate-400 text-sm">Loading history...</div>
+                </div>
+            </div>
+
+            <!-- SUBTAB 5: SETTINGS -->
+            <div id="parent-tab-settings" class="space-y-4 hidden">
+                <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm max-w-xl space-y-5">
+                    <h3 class="text-base font-bold text-slate-900">Emergency Warning & Policy Settings</h3>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Missed Medicine Alert Destination Email</label>
+                        <input type="email" id="settings-alert-email" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500" placeholder="father@example.com">
+                        <p class="text-[11px] text-slate-500 mt-1">Urgent escalation warnings will be dispatched to this address immediately upon a missed dose.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Missed Dose Grace Period</label>
+                        <select id="settings-grace-period" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500">
+                            <option value="15">15 Minutes</option>
+                            <option value="30">30 Minutes (Recommended)</option>
+                            <option value="60">60 Minutes</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <div>
+                            <div class="text-sm font-bold text-slate-800">Require Photo Proof</div>
+                            <div class="text-xs text-slate-500">Child must upload a photo when taking medicine for parent verification.</div>
+                        </div>
+                        <input type="checkbox" id="settings-require-proof" class="w-5 h-5 text-brand-600 rounded">
+                    </div>
+                    <button onclick="saveParentSettings()" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold shadow-md transition">Save Preferences</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- 4. CHILD PORTAL (MOBILE-OPTIMIZED) -->
+        <!-- ============================================== -->
+        <section id="view-child" class="view-section hidden max-w-lg mx-auto space-y-6">
+            <!-- Greeting Header -->
+            <div class="bg-gradient-to-br from-brand-600 to-brand-800 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
+                <div class="relative z-10">
+                    <div class="text-xs uppercase font-bold text-brand-200 tracking-wider">Patient Portal</div>
+                    <h2 class="text-2xl font-extrabold mt-0.5" id="child-greeting">Welcome 👋</h2>
+                    <p class="text-xs text-brand-100 mt-1">Here are your prescribed medicines for today.</p>
+                </div>
+            </div>
+
+            <!-- PENDING CONNECTION REQUESTS BANNER FOR CHILD -->
+            <div id="child-pending-requests-banner" class="hidden space-y-2"></div>
+
+            <!-- TODAY'S MEDICINES -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Scheduled Today</span>
+                    <button onclick="loadChildDashboard()" class="text-xs text-brand-600 font-semibold hover:underline">Refresh</button>
+                </div>
+                <div id="child-today-list" class="space-y-3">
+                    <div class="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 text-sm">Loading your medicines...</div>
+                </div>
+            </div>
+
+            <!-- CHILD HISTORY -->
+            <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                <h3 class="text-sm font-bold text-slate-800">My Completed Doses & Verifications</h3>
+                <div id="child-history-list" class="divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                    <div class="text-center py-4 text-xs text-slate-400">No completed doses yet today.</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ============================================== -->
+    <!-- MODALS -->
+    <!-- ============================================== -->
+
+    <!-- MODAL 0: ACTIVE MEDICINE ALARM RINGING (FOR PATIENT/CHILD) -->
+    <div id="modal-active-alarm" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 sm:p-7 shadow-2xl border-4 border-red-500 text-center space-y-5 animate-bounce-short">
+            <div class="relative flex items-center justify-center">
+                <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl pulse-alert">
+                    <i class="ph-fill ph-bell-ringing"></i>
+                </div>
+            </div>
+            <div>
+                <span class="px-3.5 py-1 bg-red-100 text-red-800 rounded-full text-xs font-black uppercase tracking-wider animate-pulse inline-block">
+                    🔔 Medicine Alarm Ringing!
+                </span>
+                <h2 class="text-2xl font-black text-slate-900 mt-3" id="alarm-med-name">Medicine Name</h2>
+                <p class="text-sm font-bold text-brand-600 mt-1" id="alarm-med-dosage">Dosage: 1 Tablet</p>
+                <p class="text-xs text-slate-500 mt-1.5" id="alarm-med-instructions">Please take your medicine now and snap photo proof.</p>
+            </div>
+            <div class="space-y-2.5 pt-2">
+                <button onclick="takeMedicineFromAlarm()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-sm font-extrabold shadow-lg shadow-emerald-500/30 flex items-center justify-center space-x-2 transition transform active:scale-95">
+                    <i class="ph-bold ph-camera text-xl"></i>
+                    <span>📸 Take Medicine & Snap Proof</span>
+                </button>
+                <button onclick="snoozeMedicineFromAlarm()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition">
+                    ⏰ Snooze (10 Minutes)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: ADD MEDICINE -->
+    <div id="modal-medicine" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">Prescribe Medicine</h3>
+                <button onclick="closeModal('modal-medicine')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+            <form onsubmit="handleSaveMedicine(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Select Child</label>
+                    <select id="med-form-child-id" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Medicine Name</label>
+                    <input type="text" id="med-form-name" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="e.g. Vitamin D3 / Amoxicillin">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dosage</label>
+                        <input type="text" id="med-form-dosage" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="e.g. 1 Tablet / 500mg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Frequency</label>
+                        <select id="med-form-frequency" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                            <option value="DAILY">Daily</option>
+                            <option value="TWICE_DAILY">Twice Daily</option>
+                            <option value="THREE_TIMES_DAILY">3 Times Daily</option>
+                            <option value="ONCE">Once</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Scheduled Time(s) (24h HH:MM)</label>
+                    <input type="text" id="med-form-times" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="e.g. 08:00 or 08:00,20:00">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Instructions / Notes</label>
+                    <textarea id="med-form-instructions" rows="2" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="e.g. Take after breakfast with full glass of water"></textarea>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeModal('modal-medicine')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold">Cancel</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold shadow-md">Save Medicine</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADD CHILD PROFILE -->
+    <div id="modal-add-child" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">Create Child Profile</h3>
+                <button onclick="closeModal('modal-add-child')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+            
+            <div id="add-child-form-section">
+                <p class="text-xs text-slate-500 mb-3">Create a profile for your child to generate a pairing code.</p>
+                <form onsubmit="handleAddChildSubmit(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Child Name *</label>
+                        <input type="text" id="add-child-name" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="e.g. Rahul">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Child Phone (Optional)</label>
+                        <input type="tel" id="add-child-phone" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="+91...">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Child Email (Optional)</label>
+                        <input type="email" id="add-child-email" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="child@example.com">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" onclick="closeModal('modal-add-child')" class="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold">Cancel</button>
+                        <button type="submit" class="flex-1 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-bold shadow-md">+ Create Child Profile</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div id="add-child-success-section" class="hidden space-y-4 text-center">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl">
+                    <i class="ph-bold ph-check"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-bold text-slate-900">Child Profile Created!</div>
+                    <div class="text-xs text-slate-500 mt-1">Use this code on the child's device to connect.</div>
+                </div>
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <div class="text-2xl font-extrabold tracking-widest text-brand-600" id="new-pairing-code">---</div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="copyToClipboard('new-pairing-code')" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1"><i class="ph-bold ph-copy"></i> Copy Code</button>
+                    <button onclick="copyLinkToClipboard('new-pairing-link')" id="new-pairing-link" data-link="" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1"><i class="ph-bold ph-link"></i> Copy Link</button>
+                </div>
+                <button onclick="closeModal('modal-add-child'); loadParentChildren();" class="w-full py-2.5 bg-brand-600 text-white rounded-xl text-sm font-bold">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: CHILD PHOTO PROOF CAPTURE -->
+    <div id="modal-photo-proof" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4">
+        <div class="bg-white sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-md p-4 sm:p-6 shadow-2xl space-y-4 flex flex-col">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100 shrink-0">
+                <h3 class="text-base font-bold text-slate-900">Confirm & Upload Proof</h3>
+                <button onclick="closePhotoProofModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+            
+            <div class="text-center p-3 bg-brand-50 rounded-2xl border border-brand-100 shrink-0">
+                <div class="text-sm font-bold text-brand-900" id="proof-med-name">Medicine Name</div>
+                <div class="text-xs text-brand-600" id="proof-med-dosage">1 Tablet</div>
+            </div>
+            
+            <form onsubmit="handleSubmitProof(event)" class="flex-1 flex flex-col space-y-3 overflow-hidden">
+                <input type="hidden" id="proof-occurrence-id">
+                
+                <div class="flex-1 relative bg-black rounded-2xl overflow-hidden min-h-[250px] flex items-center justify-center">
+                    <video id="proof-video" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline muted></video>
+                    <canvas id="proof-canvas" class="hidden"></canvas>
+                    <img id="proof-img-preview" src="" class="hidden absolute inset-0 w-full h-full object-cover">
+                    
+                    <!-- Shutter Button Overlay -->
+                    <div id="shutter-container" class="absolute bottom-4 left-0 right-0 flex justify-center">
+                        <button type="button" onclick="capturePhoto()" class="w-16 h-16 bg-white/30 rounded-full p-1 backdrop-blur-sm border-2 border-white/50">
+                            <div class="w-full h-full bg-white rounded-full flex items-center justify-center text-brand-600 shadow-lg transition transform hover:scale-95 active:scale-90">
+                                <i class="ph-fill ph-camera text-2xl"></i>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="retake-container" class="hidden flex justify-center shrink-0">
+                    <button type="button" onclick="retakePhoto()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">Retake Photo</button>
+                </div>
+                
+                <div class="shrink-0 text-center">
+                    <label class="text-xs text-brand-600 hover:underline cursor-pointer font-semibold">
+                        Or select from gallery
+                        <input type="file" id="proof-file-input" accept="image/*" class="hidden" onchange="previewProofImageFromFile(event)">
+                    </label>
+                </div>
+
+                <div class="shrink-0">
+                    <input type="text" id="proof-notes" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Note for parent (Optional)">
+                </div>
+                <button type="submit" id="btn-submit-proof" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md flex items-center justify-center space-x-2 shrink-0 disabled:opacity-50 transition">
+                    <i class="ph-bold ph-check-circle"></i>
+                    <span>Submit Medicine Proof</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: PARENT PROOF REVIEW & VERIFICATION -->
+    <div id="modal-parent-verify" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">Review Intake Proof</h3>
+                <button onclick="closeModal('modal-parent-verify')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+            <div class="space-y-3">
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                    <div><strong class="text-slate-700">Child:</strong> <span id="v-child-name">Child</span></div>
+                    <div><strong class="text-slate-700">Medicine:</strong> <span id="v-med-name">Medicine</span></div>
+                    <div><strong class="text-slate-700">Scheduled Time:</strong> <span id="v-sched-time">Time</span></div>
+                    <div><strong class="text-slate-700">Taken At:</strong> <span id="v-taken-time">Time</span></div>
+                </div>
+                <div class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 text-center">
+                    <img id="v-proof-img" src="" class="w-full max-h-64 object-cover">
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <input type="hidden" id="v-occurrence-id">
+                <button onclick="handleRequestReconfirmation()" class="flex-1 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-bold border border-amber-200">
+                    Request Reconfirmation
+                </button>
+                <button onclick="handleParentVerify()" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md">
+                    ✓ Verify Intake
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: FORGOT PASSWORD -->
+    <div id="modal-forgot-password" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">Reset Password</h3>
+                <button onclick="closeModal('modal-forgot-password')" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-500">Enter your email address to receive a secure password reset link.</p>
+            <form onsubmit="handleForgotPasswordSubmit(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Email Address</label>
+                    <input type="email" id="forgot-email-input" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="you@example.com">
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-brand-600 text-white rounded-xl text-sm font-bold shadow-md">Send Reset Link</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION CORE -->
+    <script>
+        const API_BASE = '/api';
+        let currentUser = null;
+        let pollTimer = null;
+        let audioCtx = null;
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            startPolling();
+        });
+
+        let activeAlarmOcc = null;
+        let alarmInterval = null;
+        let isAlarmPlaying = false;
+        let childTodayDoses = [];
+        let lastAlarmTriggeredId = null;
+
+        // Unlock audio and request notifications on first user gesture
+        window.addEventListener('click', () => {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }, { once: true });
+
+        // Continuous High-Priority Audio Alarm Synthesizer
+        function startAlarmSound() {
+            if (isAlarmPlaying) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                isAlarmPlaying = true;
+
+                // Vibrate on mobile
+                if (navigator.vibrate) {
+                    navigator.vibrate([400, 200, 400, 200, 600]);
+                }
+
+                function ringCycle() {
+                    if (!isAlarmPlaying || !audioCtx) return;
+                    try {
+                        const now = audioCtx.currentTime;
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+
+                        osc.type = 'triangle';
+                        // 2-tone melodic ringing chime (A5 -> D6 -> A5 -> D6)
+                        osc.frequency.setValueAtTime(880, now);
+                        osc.frequency.setValueAtTime(1174.66, now + 0.15);
+                        osc.frequency.setValueAtTime(880, now + 0.30);
+                        osc.frequency.setValueAtTime(1174.66, now + 0.45);
+
+                        gain.gain.setValueAtTime(0.35, now);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.65);
+
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.65);
+                    } catch (e) {}
+                }
+
+                ringCycle();
+                if (alarmInterval) clearInterval(alarmInterval);
+                alarmInterval = setInterval(() => {
+                    if (isAlarmPlaying) {
+                        ringCycle();
+                        if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 600]);
+                    }
+                }, 1000);
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+        function stopAlarmSound() {
+            isAlarmPlaying = false;
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
+            }
+        }
+
+        // Trigger Active Alarm Screen for Patient/Child
+        function triggerChildAlarm(occ) {
+            activeAlarmOcc = occ;
+            document.getElementById('alarm-med-name').innerText = occ.medicine_name;
+            document.getElementById('alarm-med-dosage').innerText = `Dosage: ${occ.dosage || '1 Dose'}`;
+            document.getElementById('alarm-med-instructions').innerText = occ.instructions || 'It is time to take your scheduled medicine now.';
+            document.getElementById('modal-active-alarm').classList.remove('hidden');
+
+            startAlarmSound();
+
+            // Browser Notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification(`🔔 Medicine Alarm: ${occ.medicine_name}`, {
+                        body: `Take ${occ.medicine_name} (${occ.dosage}). Please take it now!`,
+                        icon: 'https://cdn-icons-png.flaticon.com/512/883/883360.png'
+                    });
+                } catch(e) {}
+            }
+        }
+
+        function takeMedicineFromAlarm() {
+            stopAlarmSound();
+            document.getElementById('modal-active-alarm').classList.add('hidden');
+            if (activeAlarmOcc) {
+                openPhotoProofModal(activeAlarmOcc.id, activeAlarmOcc.medicine_name, activeAlarmOcc.dosage);
+            }
+        }
+
+        async function snoozeMedicineFromAlarm() {
+            stopAlarmSound();
+            document.getElementById('modal-active-alarm').classList.add('hidden');
+            if (activeAlarmOcc) {
+                await handleSnooze(activeAlarmOcc.id);
+            }
+        }
+
+        // Active 1-Second Real-Time Clock Checker (triggers alarm at exact minute)
+        function checkChildAlarmsRealtime() {
+            if (!currentUser || currentUser.role !== 'CHILD' || !childTodayDoses.length) return;
+            const now = new Date();
+            for (const d of childTodayDoses) {
+                const isTaken = ['TAKEN', 'TAKEN_LATE', 'PENDING_VERIFICATION', 'VERIFIED'].includes(d.status);
+                if (!isTaken && d.status !== 'MISSED') {
+                    const schedTime = new Date(d.scheduled_time);
+                    // If due or current time >= scheduled time within grace window
+                    if (d.status === 'DUE' || (now >= schedTime && (now - schedTime) < 30 * 60 * 1000)) {
+                        if (lastAlarmTriggeredId !== d.id && !isAlarmPlaying) {
+                            lastAlarmTriggeredId = d.id;
+                            triggerChildAlarm(d);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        setInterval(checkChildAlarmsRealtime, 1000);
+
+        function playChime() {
+            startAlarmSound();
+        }
+
+        // Unified Safe Error Formatter
+        function formatErrorMessage(err) {
+            if (!err) return 'An unexpected error occurred.';
+            if (typeof err === 'string') return err;
+            if (Array.isArray(err)) {
+                return err.map(item => {
+                    if (typeof item === 'string') return item;
+                    if (item && item.msg) {
+                        const cleanMsg = item.msg.replace(/^Value error,\s*/i, '');
+                        if (item.loc && item.loc.length > 1) {
+                            const field = item.loc[item.loc.length - 1];
+                            const formattedField = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
+                            return `${formattedField}: ${cleanMsg}`;
+                        }
+                        return cleanMsg;
+                    }
+                    return JSON.stringify(item);
+                }).join(' • ');
+            }
+            if (typeof err === 'object') {
+                if (err.detail) return formatErrorMessage(err.detail);
+                if (err.message) return err.message;
+                if (err.msg) return err.msg.replace(/^Value error,\s*/i, '');
+                try {
+                    return Object.values(err).map(v => typeof v === 'object' ? formatErrorMessage(v) : String(v)).join(' • ');
+                } catch(e) {
+                    return 'An error occurred processing the request.';
+                }
+            }
+            return String(err);
+        }
+
+        // Unified API Fetch with Token Auth
+        async function apiFetch(endpoint, options = {}) {
+            const token = localStorage.getItem('caresync_token');
+            const headers = options.headers || {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            options.headers = headers;
+            options.credentials = 'include';
+            return fetch(endpoint, options);
+        }
+
+        function getProofUrl(proofId) {
+            if (!proofId) return '';
+            const token = localStorage.getItem('caresync_token');
+            return `${API_BASE}/proofs/${proofId}/view${token ? '?token=' + encodeURIComponent(token) : ''}`;
+        }
+
+        function showToast(msg, type = 'info') {
+            const cleanMsg = formatErrorMessage(msg);
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bg = type === 'success' ? 'bg-emerald-600 text-white' : type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white';
+            const icon = type === 'error' ? 'ph-warning-circle' : type === 'success' ? 'ph-check-circle' : 'ph-info';
+            toast.className = `${bg} px-4 py-3 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all transform duration-300 max-w-md`;
+            toast.innerHTML = `<i class="ph-bold ${icon} text-lg shrink-0"></i><span class="break-words">${cleanMsg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { 
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        async function checkAuth() {
+            try {
+                const res = await apiFetch(`${API_BASE}/auth/me`);
+                if (res.ok) {
+                    currentUser = await res.json();
+                    updateNavState(true);
+                    if (currentUser.role === 'PARENT') {
+                        navigate('parent');
+                        loadParentDashboard();
+                    } else {
+                        navigate('child');
+                        loadChildDashboard();
+                    }
+                    loadNotifications();
+                } else {
+                    currentUser = null;
+                    localStorage.removeItem('caresync_token');
+                    updateNavState(false);
+                    navigate('landing');
+                }
+            } catch (e) {
+                currentUser = null;
+                updateNavState(false);
+                navigate('landing');
+            }
+        }
+
+        function updateNavState(isAuth) {
+            document.getElementById('nav-unauth').classList.toggle('hidden', isAuth);
+            document.getElementById('nav-auth').classList.toggle('hidden', !isAuth);
+            if (isAuth && currentUser) {
+                document.getElementById('user-name-text').innerText = currentUser.name;
+                document.getElementById('user-role-badge').innerText = currentUser.role;
+                document.getElementById('user-avatar-text').innerText = currentUser.name.charAt(0).toUpperCase();
+            }
+        }
+
+        function navigate(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(`view-${viewName}`);
+            if (target) target.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function switchAuthTab(tab) {
+            const isLogin = tab === 'login';
+            const isSignup = tab === 'signup';
+            const isJoin = tab === 'joincode';
+            
+            document.getElementById('tab-login-btn').className = isLogin ? 'flex-1 pb-2 text-sm font-bold text-center border-b-2 border-brand-600 text-brand-600' : 'flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600';
+            document.getElementById('tab-signup-btn').className = isSignup ? 'flex-1 pb-2 text-sm font-bold text-center border-b-2 border-brand-600 text-brand-600' : 'flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600';
+            const joinBtn = document.getElementById('tab-joincode-btn');
+            if(joinBtn) joinBtn.className = isJoin ? 'flex-1 pb-2 text-sm font-bold text-center border-b-2 border-brand-600 text-brand-600' : 'flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600';
+            
+            document.getElementById('form-login').classList.toggle('hidden', !isLogin);
+            document.getElementById('form-signup').classList.toggle('hidden', !isSignup);
+            const formJoin = document.getElementById('form-joincode');
+            if(formJoin) formJoin.classList.toggle('hidden', !isJoin);
+            
+            navigate('auth');
+        }
+
+        function checkPasswordStrength(pwd) {
+            document.getElementById('pwd-req-len').style.color = pwd.length >= 8 ? '#10b981' : '#94a3b8';
+            document.getElementById('pwd-req-case').style.color = (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) ? '#10b981' : '#94a3b8';
+            document.getElementById('pwd-req-num').style.color = (/\d/.test(pwd) && /[!@#$%^&*(),.?":{}|<>]/.test(pwd)) ? '#10b981' : '#94a3b8';
+        }
+
+
+        // Login Handler
+        async function handleLoginSubmit(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            const remember_me = document.getElementById('login-remember').checked;
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, remember_me })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('caresync_token', data.access_token);
+                    showToast('Welcome back!', 'success');
+                    await checkAuth();
+                } else {
+                    showToast(data.detail || data.message || 'Login failed.', 'error');
+                }
+            } catch (e) {
+                showToast('Network error during login.', 'error');
+            }
+        }
+
+        // Signup Handler
+        async function handleSignupSubmit(e) {
+            e.preventDefault();
+            const role = document.querySelector('input[name="signup-role"]:checked').value;
+            const name = document.getElementById('signup-name').value.trim();
+            const email = document.getElementById('signup-email').value.trim();
+            const phone = document.getElementById('signup-phone').value.trim();
+            const password = document.getElementById('signup-password').value;
+            const confirm_password = document.getElementById('signup-confirm-password').value;
+
+            if (password !== confirm_password) {
+                showToast('Passwords do not match. Please re-enter.', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role, name, email, phone, password, confirm_password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('caresync_token', data.access_token);
+                    showToast('Account created! Welcome to CareSync.', 'success');
+                    await checkAuth();
+                } else {
+                    showToast(data.detail || data.message || 'Signup failed.', 'error');
+                }
+            } catch (e) {
+                showToast('Network error during signup.', 'error');
+            }
+        }
+        
+        // Join with Code Handler
+        async function handleJoinCodeSubmit(e) {
+            e.preventDefault();
+            const code = document.getElementById('join-code-input').value.trim();
+            try {
+                const res = await fetch(`${API_BASE}/relationships/join-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pairing_code: code })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('caresync_token', data.access_token);
+                    showToast('Successfully joined with family code!', 'success');
+                    await checkAuth();
+                } else {
+                    showToast(data.detail || data.message || 'Invalid code.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error.', 'error');
+            }
+        }
+
+        async function handleLogout() {
+            await apiFetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+            localStorage.removeItem('caresync_token');
+            currentUser = null;
+            updateNavState(false);
+            navigate('landing');
+            showToast('Signed out successfully.', 'info');
+        }
+
+        // Forgot Password
+        function openForgotPasswordModal() {
+            document.getElementById('modal-forgot-password').classList.remove('hidden');
+        }
+
+        async function handleForgotPasswordSubmit(e) {
+            e.preventDefault();
+            const email = document.getElementById('forgot-email-input').value.trim();
+            try {
+                const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || 'Password reset link dispatched.', 'success');
+                    closeModal('modal-forgot-password');
+                } else {
+                    showToast(data.detail || 'Could not send reset link.', 'error');
+                }
+            } catch (e) {
+                showToast('Network error.', 'error');
+            }
+        }
+
+        // Parent Subtabs
+        function switchParentSubTab(tabName) {
+            ['schedule', 'medicines', 'children', 'history', 'settings'].forEach(t => {
+                document.getElementById(`parent-tab-${t}`).classList.toggle('hidden', t !== tabName);
+                const btn = document.getElementById(`ptab-${t}-btn`);
+                if (btn) {
+                    btn.className = t === tabName ? 'pb-3 text-sm font-bold text-brand-600 border-b-2 border-brand-600 whitespace-nowrap' : 'pb-3 text-sm font-bold text-slate-400 hover:text-slate-600 whitespace-nowrap';
+                }
+            });
+            if (tabName === 'schedule') loadParentDashboard();
+            if (tabName === 'medicines') loadParentMedicines();
+            if (tabName === 'children') loadParentChildren();
+            if (tabName === 'history') loadParentHistory();
+            if (tabName === 'settings') loadParentSettings();
+        }
+
+        // Load Parent Dashboard Stats & Schedule
+        async function loadParentDashboard() {
+            if (!currentUser) return;
+            document.getElementById('parent-greeting').innerText = `Good day, ${currentUser.name}`;
+            
+            if (!document.getElementById('top-alert-email').value) {
+                document.getElementById('top-alert-email').value = currentUser.alert_email || currentUser.email || '';
+            }
+
+            try {
+                const statsRes = await apiFetch(`${API_BASE}/parent/dashboard/stats`);
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    document.getElementById('stat-total').innerText = stats.total_today;
+                    document.getElementById('stat-taken').innerText = stats.taken_today;
+                    document.getElementById('stat-pending').innerText = stats.pending_today;
+                    document.getElementById('stat-missed').innerText = stats.missed_today;
+
+                    const missedBanner = document.getElementById('parent-missed-alert-banner');
+                    if (stats.missed_today > 0) {
+                        missedBanner.classList.remove('hidden');
+                        document.getElementById('missed-banner-title').innerText = `⚠️ ${stats.child_name || 'Child'} has ${stats.missed_today} Missed Medicine(s)!`;
+                        if (stats.next_medicine && stats.next_medicine.child_phone) {
+                            document.getElementById('btn-call-child').href = `tel:${stats.next_medicine.child_phone}`;
+                            document.getElementById('btn-call-label').innerText = `Call ${stats.child_name || 'Child'} (${stats.next_medicine.child_phone})`;
+                        }
+                    } else {
+                        missedBanner.classList.add('hidden');
+                    }
+                }
+
+                const schedRes = await apiFetch(`${API_BASE}/parent/schedule?range_type=today`);
+                if (schedRes.ok) {
+                    const doses = await schedRes.json();
+                    renderParentSchedule(doses);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        
+        async function saveTopAlertEmail() {
+            const emailInput = document.getElementById('top-alert-email');
+            const alert_email = emailInput ? emailInput.value.trim() : '';
+            const feedback = document.getElementById('alert-email-feedback');
+
+            try {
+                const res = await apiFetch(`${API_BASE}/auth/profile`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ alert_email })
+                });
+                if (res.ok) {
+                    currentUser = await res.json();
+                    showToast('Emergency alert email(s) saved successfully!', 'success');
+                    if (feedback) {
+                        feedback.innerText = `💾 Saved: Alerts active for [${alert_email || currentUser.email}]`;
+                        feedback.classList.remove('hidden');
+                    }
+                } else {
+                    const data = await res.json();
+                    showToast(data.detail || 'Failed to update alert email.', 'error');
+                }
+            } catch (e) {
+                showToast('Network error.', 'error');
+            }
+        }
+
+        async function sendTestAlertEmail() {
+            const emailInput = document.getElementById('top-alert-email');
+            const alert_email = emailInput ? emailInput.value.trim() : '';
+            const btn = document.getElementById('btn-test-alert-email');
+            const feedback = document.getElementById('alert-email-feedback');
+
+            if (!alert_email) {
+                showToast('Please enter an alert email address first.', 'error');
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i><span>Sending...</span>';
+            }
+
+            try {
+                const res = await apiFetch(`${API_BASE}/auth/send-test-alert-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: alert_email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || 'Test verification email sent successfully!', 'success');
+                    if (feedback) {
+                        feedback.innerText = `✅ Test verification email dispatched to [${alert_email}]. Check your inbox!`;
+                        feedback.classList.remove('hidden');
+                    }
+                } else {
+                    showToast(data.detail || 'Failed to send test email.', 'error');
+                }
+            } catch (e) {
+                showToast('Network error while sending test email.', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="ph-bold ph-paper-plane-tilt"></i><span>🧪 Send Test Email</span>';
+                }
+            }
+        }
+
+        function renderParentSchedule(doses) {
+            const list = document.getElementById('parent-schedule-list');
+            if (!doses || doses.length === 0) {
+                list.innerHTML = `<div class="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">No scheduled medicines for today.</div>`;
+                return;
+            }
+
+            list.innerHTML = doses.map(d => {
+                const timeStr = new Date(d.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                let statusBadge = `<span class="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">${d.status}</span>`;
+                let actionBtn = '';
+
+                if (d.status === 'VERIFIED') {
+                    statusBadge = `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold rounded-lg text-xs">✓ Verified</span>`;
+                } else if (d.status === 'PENDING_VERIFICATION') {
+                    statusBadge = `<span class="px-2.5 py-1 bg-purple-100 text-purple-800 font-bold rounded-lg text-xs">📸 Review Proof</span>`;
+                    actionBtn = `<button onclick="openParentVerifyModal(${JSON.stringify(d).replace(/"/g, '&quot;')})" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-xl shadow-sm hover:bg-brand-700">Review Proof</button>`;
+                } else if (d.status === 'MISSED') {
+                    statusBadge = `<span class="px-2.5 py-1 bg-red-100 text-red-800 font-bold rounded-lg text-xs">⚠️ Missed</span>`;
+                    if (d.child_phone) {
+                        actionBtn = `<a href="tel:${d.child_phone}" class="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-xl shadow-sm hover:bg-red-700 flex items-center space-x-1"><i class="ph-bold ph-phone-call"></i><span>Call</span></a>`;
+                    }
+                } else if (d.status === 'TAKEN' || d.status === 'TAKEN_LATE') {
+                    statusBadge = `<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold rounded-lg text-xs">Taken</span>`;
+                }
+
+                let photoThumbHtml = '';
+                if (d.proof && d.proof.id) {
+                    photoThumbHtml = `
+                    <div class="relative group cursor-pointer shrink-0 ml-2" onclick="openParentVerifyModal(${JSON.stringify(d).replace(/"/g, '&quot;')})" title="Click to inspect intake photo proof">
+                        <img src="${getProofUrl(d.proof.id)}" class="w-12 h-12 rounded-2xl object-cover border-2 border-emerald-400 shadow-sm group-hover:scale-105 transition">
+                        <div class="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition">
+                            <i class="ph-bold ph-magnifying-glass-plus"></i>
+                        </div>
+                    </div>`;
+                }
+
+                return `
+                <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
+                            <i class="ph-bold ph-pill"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-bold text-slate-900">${d.medicine_name}</span>
+                                <span class="text-xs text-slate-400 font-medium">(${d.dosage})</span>
+                            </div>
+                            <div class="text-xs text-slate-500 mt-0.5">
+                                Scheduled: <strong>${timeStr}</strong> for <strong>${d.child_name}</strong>
+                                ${d.taken_at ? `• Taken: <span class="text-emerald-700 font-semibold">${new Date(d.taken_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 self-end sm:self-auto">
+                        ${photoThumbHtml}
+                        ${statusBadge}
+                        ${actionBtn}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Subtab: Prescriptions
+        async function loadParentMedicines() {
+            try {
+                const res = await apiFetch(`${API_BASE}/parent/medicines`);
+                if (res.ok) {
+                    const meds = await res.json();
+                    const list = document.getElementById('parent-medicines-list');
+                    if (meds.length === 0) {
+                        list.innerHTML = `<div class="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs col-span-2">No prescriptions created yet. Click "+ New Medicine" above.</div>`;
+                        return;
+                    }
+                    list.innerHTML = meds.map(m => `
+                        <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-base font-extrabold text-slate-900">${m.name}</h4>
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${m.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">${m.is_active ? 'ACTIVE' : 'PAUSED'}</span>
+                            </div>
+                            <div class="text-xs text-slate-600 space-y-1">
+                                <div><strong>Dosage:</strong> ${m.dosage}</div>
+                                <div><strong>Timing:</strong> ${m.times_of_day} (${m.frequency})</div>
+                                ${m.instructions ? `<div><strong>Instructions:</strong> ${m.instructions}</div>` : ''}
+                            </div>
+                            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                                <button onclick="toggleMedicineActive(${m.id})" class="px-3 py-1.5 text-xs font-semibold rounded-lg ${m.is_active ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}">
+                                    ${m.is_active ? 'Pause' : 'Resume'}
+                                </button>
+                                <button onclick="deleteMedicine(${m.id})" class="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function toggleMedicineActive(id) {
+            try {
+                const res = await apiFetch(`${API_BASE}/parent/medicines/${id}/toggle-active`, { method: 'POST' });
+                if (res.ok) {
+                    showToast('Medicine status updated.', 'info');
+                    loadParentMedicines();
+                }
+            } catch (e) {
+                showToast('Error updating status.', 'error');
+            }
+        }
+
+        async function deleteMedicine(id) {
+            if (!confirm('Are you sure you want to delete this medicine prescription?')) return;
+            try {
+                const res = await apiFetch(`${API_BASE}/parent/medicines/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showToast('Medicine deleted.', 'info');
+                    loadParentMedicines();
+                    loadParentDashboard();
+                }
+            } catch (e) {
+                showToast('Error deleting medicine.', 'error');
+            }
+        }
+
+        // Subtab: Connected Children
+        async function loadParentChildren() {
+            try {
+                const res = await apiFetch(`${API_BASE}/relationships/parent/children`);
+                if (res.ok) {
+                    const children = await res.json();
+                    const list = document.getElementById('parent-children-list');
+                    if (children.length === 0) {
+                        list.innerHTML = `<div class="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">No children connected yet. Click "+ Invite Child" above.</div>`;
+                        return;
+                    }
+                    list.innerHTML = children.map(c => `
+                        <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-base shrink-0">
+                                    ${c.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <div class="text-sm font-bold text-slate-900">${c.name}</div>
+                                    <div class="text-xs text-slate-500">${c.email || ''} ${c.phone ? `• ${c.phone}` : ''}</div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col sm:items-end gap-1">
+                                <span class="px-3 py-1 rounded-full text-xs font-bold ${c.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'} inline-block text-center">
+                                    ${c.status === 'ACCEPTED' ? '✓ Connected' : '⏳ Invite Pending'}
+                                </span>
+                                ${c.pairing_code && c.status !== 'ACCEPTED' ? `
+                                <div class="flex items-center gap-1 mt-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                                    <span class="text-xs font-mono font-bold text-slate-700" id="code-${c.id}">${c.pairing_code}</span>
+                                    <button onclick="navigator.clipboard.writeText('${c.pairing_code}'); showToast('Copied!', 'success')" class="text-slate-400 hover:text-brand-600"><i class="ph-bold ph-copy"></i></button>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Subtab: History
+        async function loadParentHistory() {
+            try {
+                const res = await apiFetch(`${API_BASE}/parent/history?days=14`);
+                if (res.ok) {
+                    const logs = await res.json();
+                    const list = document.getElementById('parent-history-list');
+                    if (logs.length === 0) {
+                        list.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">No dose history records found.</div>`;
+                        return;
+                    }
+                    list.innerHTML = logs.map(l => {
+                        const dateStr = new Date(l.scheduled_time).toLocaleString();
+                        let proofThumb = '';
+                        if (l.proof && l.proof.id) {
+                            proofThumb = `
+                            <img src="${getProofUrl(l.proof.id)}" onclick="openParentVerifyModal(${JSON.stringify(l).replace(/"/g, '&quot;')})" class="w-10 h-10 rounded-xl object-cover border border-emerald-300 shadow-sm cursor-pointer hover:scale-105 transition shrink-0" title="Click to inspect photo proof">`;
+                        }
+                        return `
+                        <div class="p-4 flex items-center justify-between gap-3">
+                            <div class="flex items-center space-x-3">
+                                ${proofThumb}
+                                <div>
+                                    <div class="text-sm font-bold text-slate-800">${l.medicine_name} <span class="text-xs text-slate-400 font-normal">(${l.dosage})</span></div>
+                                    <div class="text-xs text-slate-500">${l.child_name} • Scheduled: ${dateStr}</div>
+                                </div>
+                            </div>
+                            <span class="px-2.5 py-1 text-xs font-bold rounded-lg shrink-0 ${l.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : l.status === 'MISSED' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'}">
+                                ${l.status}
+                            </span>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Subtab: Settings
+        function loadParentSettings() {
+            if (!currentUser) return;
+            document.getElementById('settings-alert-email').value = currentUser.alert_email || currentUser.email || '';
+            document.getElementById('settings-grace-period').value = currentUser.grace_period_minutes || 30;
+            document.getElementById('settings-require-proof').checked = currentUser.require_photo_proof !== false;
+        }
+
+        async function saveParentSettings() {
+            const alert_email = document.getElementById('settings-alert-email').value;
+            const grace_period_minutes = parseInt(document.getElementById('settings-grace-period').value);
+            const require_photo_proof = document.getElementById('settings-require-proof').checked;
+
+            try {
+                const res = await apiFetch(`${API_BASE}/auth/profile`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ alert_email, grace_period_minutes, require_photo_proof })
+                });
+                if (res.ok) {
+                    currentUser = await res.json();
+                    showToast('Settings saved successfully!', 'success');
+                } else {
+                    showToast('Failed to save settings.', 'error');
+                }
+            } catch (e) {
+                showToast('Network error.', 'error');
+            }
+        }
+
+        // Child Portal Operations
+        async function loadChildDashboard() {
+            if (!currentUser) return;
+            document.getElementById('child-greeting').innerText = `Hi ${currentUser.name} 👋`;
+
+            try {
+                // Check pending connection invitations
+                const connRes = await apiFetch(`${API_BASE}/relationships/child/connections`);
+                if (connRes.ok) {
+                    const connections = await connRes.json();
+                    const pending = connections.filter(c => c.status === 'PENDING');
+                    const banner = document.getElementById('child-pending-requests-banner');
+                    if (pending.length > 0) {
+                        banner.classList.remove('hidden');
+                        banner.innerHTML = pending.map(p => `
+                            <div class="p-4 bg-brand-50 border border-brand-200 rounded-2xl flex items-center justify-between">
+                                <div>
+                                    <div class="text-xs font-bold text-brand-900">Connection Request from ${p.name}</div>
+                                    <div class="text-[11px] text-brand-700">${p.email ? p.email + ' wants' : 'Wants'} to manage your reminders.</div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="respondConnection(${p.relationship_id}, 'ACCEPT')" class="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-bold shadow-sm">Accept</button>
+                                    <button onclick="respondConnection(${p.relationship_id}, 'REJECT')" class="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">Decline</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        banner.classList.add('hidden');
+                    }
+                }
+
+                // Load today's medicines
+                const res = await apiFetch(`${API_BASE}/child/medicines/today`);
+                if (res.ok) {
+                    const doses = await res.json();
+                    childTodayDoses = doses;
+                    renderChildToday(doses);
+
+                    const dueDose = doses.find(d => d.status === 'DUE');
+                    if (dueDose && !isAlarmPlaying && lastAlarmTriggeredId !== dueDose.id) {
+                        lastAlarmTriggeredId = dueDose.id;
+                        triggerChildAlarm(dueDose);
+                    }
+                }
+
+                // Load completed doses history
+                const histRes = await apiFetch(`${API_BASE}/child/history?days=3`);
+                if (histRes.ok) {
+                    const hist = await histRes.json();
+                    const list = document.getElementById('child-history-list');
+                    if (hist.length === 0) {
+                        list.innerHTML = `<div class="text-center py-4 text-xs text-slate-400">No completed doses yet today.</div>`;
+                    } else {
+                        list.innerHTML = hist.map(h => {
+                            let thumb = '';
+                            if(h.proof && h.proof.id) {
+                                thumb = `<img src="${getProofUrl(h.proof.id)}" class="w-6 h-6 rounded border border-slate-200 object-cover ml-2">`;
+                            }
+                            return `
+                            <div class="py-2.5 flex items-center justify-between">
+                                <div>
+                                    <div class="text-xs font-bold text-slate-800 flex items-center">${h.medicine_name} ${thumb}</div>
+                                    <div class="text-[10px] text-slate-500">${new Date(h.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${h.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}">
+                                    ${h.status === 'VERIFIED' ? '<i class="ph-bold ph-check-circle text-emerald-600"></i>' : ''} ${h.status}
+                                </span>
+                            </div>
+                            `;
+                        }).join('');
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function respondConnection(relationshipId, action) {
+            try {
+                const res = await apiFetch(`${API_BASE}/relationships/child/respond`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ relationship_id: relationshipId, action })
+                });
+                if (res.ok) {
+                    showToast(action === 'ACCEPT' ? 'Connection accepted!' : 'Connection declined.', 'success');
+                    loadChildDashboard();
+                }
+            } catch (e) {
+                showToast('Error responding to request.', 'error');
+            }
+        }
+
+        function renderChildToday(doses) {
+            const list = document.getElementById('child-today-list');
+            if (!doses || doses.length === 0) {
+                list.innerHTML = `<div class="p-8 text-center bg-white rounded-3xl border border-slate-200 text-slate-400 text-sm">🎉 You're all caught up with today's medicines!</div>`;
+                return;
+            }
+
+            list.innerHTML = doses.map(d => {
+                const timeStr = new Date(d.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const isTaken = ['TAKEN', 'TAKEN_LATE', 'PENDING_VERIFICATION', 'VERIFIED'].includes(d.status);
+
+                let actionSection = '';
+                if (isTaken) {
+                    let thumbHtml = '';
+                    if (d.proof && d.proof.id) {
+                        thumbHtml = `<img src="${getProofUrl(d.proof.id)}" class="mt-2 w-full max-h-32 object-cover rounded-xl border border-emerald-200 opacity-80">`;
+                    }
+                    actionSection = `
+                    <div class="w-full p-3 bg-emerald-50 text-emerald-700 rounded-2xl text-center text-xs font-bold border border-emerald-200">
+                        <div class="flex items-center justify-center gap-1"><i class="ph-bold ph-check-circle"></i> ✓ Dose Taken & Confirmed</div>
+                        ${thumbHtml}
+                    </div>`;
+                } else {
+                    actionSection = `
+                    <div class="grid grid-cols-2 gap-2 pt-2">
+                        <button onclick="openPhotoProofModal(${d.id}, '${(d.medicine_name||'').replace(/'/g, "\\'")}', '${(d.dosage||'').replace(/'/g, "\\'")}')" class="py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-2xl font-bold text-xs shadow-md shadow-brand-500/20 flex items-center justify-center space-x-1.5">
+                            <i class="ph-bold ph-camera"></i>
+                            <span>Take & Upload</span>
+                        </button>
+                        <button onclick="handleSnooze(${d.id})" class="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center space-x-1.5">
+                            <i class="ph-bold ph-clock"></i>
+                            <span>Snooze (10m)</span>
+                        </button>
+                    </div>`;
+                }
+
+                return `
+                <div class="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm space-y-3 ${d.status === 'DUE' ? 'ring-2 ring-brand-500' : ''}">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full">${timeStr}</span>
+                        <span class="text-[11px] font-bold ${d.status === 'MISSED' ? 'text-red-600' : d.status === 'DUE' ? 'text-amber-600' : 'text-slate-400'} uppercase">${d.status}</span>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-extrabold text-slate-900">${d.medicine_name}</h3>
+                        <p class="text-xs text-slate-600 font-medium mt-0.5">Dosage: ${d.dosage}</p>
+                        ${d.instructions ? `<p class="text-xs text-slate-400 italic mt-1">${d.instructions}</p>` : ''}
+                    </div>
+                    ${actionSection}
+                </div>`;
+            }).join('');
+        }
+
+        let proofStream = null;
+        let capturedBlob = null;
+
+        async function openPhotoProofModal(occurrenceId, medName, dosage) {
+            document.getElementById('proof-occurrence-id').value = occurrenceId;
+            document.getElementById('proof-med-name').innerText = medName;
+            document.getElementById('proof-med-dosage').innerText = dosage;
+            
+            document.getElementById('proof-img-preview').classList.add('hidden');
+            document.getElementById('proof-video').classList.remove('hidden');
+            document.getElementById('shutter-container').classList.remove('hidden');
+            document.getElementById('retake-container').classList.add('hidden');
+            document.getElementById('proof-file-input').value = '';
+            document.getElementById('proof-notes').value = '';
+            capturedBlob = null;
+            document.getElementById('btn-submit-proof').disabled = true;
+            
+            document.getElementById('modal-photo-proof').classList.remove('hidden');
+
+            const constraintsList = [
+                { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+                { video: { facingMode: 'user' } },
+                { video: true }
+            ];
+
+            let started = false;
+            for (const constraints of constraintsList) {
+                try {
+                    proofStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    const videoEl = document.getElementById('proof-video');
+                    videoEl.srcObject = proofStream;
+                    await videoEl.play().catch(() => {});
+                    started = true;
+                    break;
+                } catch (err) {
+                    // Try next constraint
+                }
+            }
+
+            if (!started) {
+                console.warn("Hardware camera unavailable or blocked; gallery fallback available.");
+                showToast("Camera access unavailable. Please use 'Select from gallery' below.", "info");
+            }
+        }
+
+        function closePhotoProofModal() {
+            stopAlarmSound();
+            if (proofStream) {
+                proofStream.getTracks().forEach(t => t.stop());
+                proofStream = null;
+            }
+            document.getElementById('modal-photo-proof').classList.add('hidden');
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('proof-video');
+            const canvas = document.getElementById('proof-canvas');
+            const w = video.videoWidth || video.clientWidth || 640;
+            const h = video.videoHeight || video.clientHeight || 480;
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, w, h);
+
+            function setCapturedBlob(blob) {
+                capturedBlob = blob;
+                document.getElementById('proof-img-preview').src = URL.createObjectURL(blob);
+                document.getElementById('proof-img-preview').classList.remove('hidden');
+                document.getElementById('proof-video').classList.add('hidden');
+                document.getElementById('shutter-container').classList.add('hidden');
+                document.getElementById('retake-container').classList.remove('hidden');
+                document.getElementById('btn-submit-proof').disabled = false;
+            }
+
+            try {
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        setCapturedBlob(blob);
+                    } else {
+                        // Fallback using dataURL
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        const byteString = atob(dataUrl.split(',')[1]);
+                        const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
+                        const ab = new ArrayBuffer(byteString.length);
+                        const ia = new Uint8Array(ab);
+                        for (let i = 0; i < byteString.length; i++) {
+                            ia[i] = byteString.charCodeAt(i);
+                        }
+                        setCapturedBlob(new Blob([ab], { type: mimeString }));
+                    }
+                }, 'image/jpeg', 0.85);
+            } catch (e) {
+                console.error("Canvas capture error:", e);
+                showToast("Could not capture photo. Please use gallery fallback.", "error");
+            }
+        }
+
+        function retakePhoto() {
+            capturedBlob = null;
+            document.getElementById('proof-file-input').value = '';
+            document.getElementById('proof-img-preview').classList.add('hidden');
+            document.getElementById('proof-video').classList.remove('hidden');
+            document.getElementById('shutter-container').classList.remove('hidden');
+            document.getElementById('retake-container').classList.add('hidden');
+            document.getElementById('btn-submit-proof').disabled = true;
+        }
+
+        function previewProofImageFromFile(e) {
+            const file = e.target.files[0];
+            if (file) {
+                capturedBlob = file;
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    document.getElementById('proof-img-preview').src = evt.target.result;
+                    document.getElementById('proof-img-preview').classList.remove('hidden');
+                    document.getElementById('proof-video').classList.add('hidden');
+                    document.getElementById('shutter-container').classList.add('hidden');
+                    document.getElementById('retake-container').classList.remove('hidden');
+                    document.getElementById('btn-submit-proof').disabled = false;
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function handleSubmitProof(e) {
+            e.preventDefault();
+            const occId = document.getElementById('proof-occurrence-id').value;
+            const notes = document.getElementById('proof-notes').value;
+
+            if (!capturedBlob) {
+                showToast('Please capture or select a photo.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', capturedBlob, 'proof.jpg');
+            if (notes) formData.append('notes', notes);
+
+            document.getElementById('btn-submit-proof').disabled = true;
+            document.getElementById('btn-submit-proof').innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i><span>Uploading...</span>';
+
+            try {
+                const res = await apiFetch(`${API_BASE}/medicine-occurrences/${occId}/proof`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    stopAlarmSound();
+                    showToast('Proof submitted! Parent notified.', 'success');
+                    closePhotoProofModal();
+                    loadChildDashboard();
+                } else {
+                    const data = await res.json();
+                    showToast(data.detail || 'Failed to upload proof.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error during upload.', 'error');
+            } finally {
+                document.getElementById('btn-submit-proof').innerHTML = '<i class="ph-bold ph-check-circle"></i><span>Submit Medicine Proof</span>';
+                document.getElementById('btn-submit-proof').disabled = false;
+            }
+        }
+
+        async function handleSnooze(occId) {
+            stopAlarmSound();
+            try {
+                const res = await apiFetch(`${API_BASE}/medicine-occurrences/${occId}/snooze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ minutes: 10 })
+                });
+                if (res.ok) {
+                    showToast('Reminder snoozed by 10 minutes.', 'info');
+                    loadChildDashboard();
+                }
+            } catch (e) {
+                showToast('Error snoozing reminder.', 'error');
+            }
+        }
+
+        // Parent Verification Modal
+        function openParentVerifyModal(occ) {
+            document.getElementById('v-occurrence-id').value = occ.id;
+            document.getElementById('v-child-name').innerText = occ.child_name;
+            document.getElementById('v-med-name').innerText = `${occ.medicine_name} (${occ.dosage})`;
+            document.getElementById('v-sched-time').innerText = new Date(occ.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('v-taken-time').innerText = occ.taken_at ? new Date(occ.taken_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+
+            const proofImg = document.getElementById('v-proof-img');
+            if (occ.proof && occ.proof.id) {
+                proofImg.src = getProofUrl(occ.proof.id);
+                proofImg.style.display = '';
+            } else {
+                proofImg.src = '';
+                proofImg.style.display = 'none';
+            }
+            document.getElementById('modal-parent-verify').classList.remove('hidden');
+        }
+
+        async function handleParentVerify() {
+            const occId = document.getElementById('v-occurrence-id').value;
+            try {
+                const res = await apiFetch(`${API_BASE}/parent/confirmations/${occId}/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes: 'Verified by parent' })
+                });
+                if (res.ok) {
+                    showToast('Medication verified successfully!', 'success');
+                    closeModal('modal-parent-verify');
+                    loadParentDashboard();
+                }
+            } catch (e) {
+                showToast('Error verifying proof.', 'error');
+            }
+        }
+
+        async function handleRequestReconfirmation() {
+            const occId = document.getElementById('v-occurrence-id').value;
+            try {
+                const res = await apiFetch(`${API_BASE}/parent/confirmations/${occId}/request-reconfirmation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notes: 'Photo unclear, please retake' })
+                });
+                if (res.ok) {
+                    showToast('Reconfirmation request sent to child.', 'info');
+                    closeModal('modal-parent-verify');
+                    loadParentDashboard();
+                }
+            } catch (e) {
+                showToast('Error requesting reconfirmation.', 'error');
+            }
+        }
+
+        // Notifications
+        async function loadNotifications() {
+            try {
+                const res = await apiFetch(`${API_BASE}/notifications`);
+                if (res.ok) {
+                    const notifs = await res.json();
+                    const unread = notifs.filter(n => !n.is_read);
+                    const badge = document.getElementById('notif-badge');
+                    badge.classList.toggle('hidden', unread.length === 0);
+
+                    const list = document.getElementById('notif-list');
+                    if (notifs.length === 0) {
+                        list.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">No notifications yet.</div>`;
+                    } else {
+                        list.innerHTML = notifs.map(n => `
+                            <div class="p-3 hover:bg-slate-50 transition ${!n.is_read ? 'bg-brand-50/40' : ''}">
+                                <div class="text-xs font-bold text-slate-800">${n.title}</div>
+                                <div class="text-[11px] text-slate-600 mt-0.5">${n.message}</div>
+                                <div class="text-[9px] text-slate-400 mt-1">${new Date(n.created_at).toLocaleTimeString()}</div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function toggleNotifications() {
+            document.getElementById('notif-drawer').classList.toggle('hidden');
+        }
+
+        async function markAllNotificationsRead() {
+            await apiFetch(`${API_BASE}/notifications/read-all`, { method: 'POST' });
+            loadNotifications();
+        }
+
+        // Helpers
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(() => {
+                if (currentUser) {
+                    if (currentUser.role === 'PARENT') loadParentDashboard();
+                    else loadChildDashboard();
+                    loadNotifications();
+                }
+            }, 15000);
+        }
+
+        function openAddMedicineModal() {
+            apiFetch(`${API_BASE}/relationships/parent/children`).then(r => r.json()).then(children => {
+                const sel = document.getElementById('med-form-child-id');
+                sel.innerHTML = children.map(c => `<option value="${c.user_id}">${c.name}${c.email ? ' (' + c.email + ')' : ''}</option>`).join('');
+                document.getElementById('modal-medicine').classList.remove('hidden');
+            }).catch(() => showToast('Could not load children list.', 'error'));
+        }
+
+        function openAddChildModal() {
+            document.getElementById('add-child-form-section').classList.remove('hidden');
+            document.getElementById('add-child-success-section').classList.add('hidden');
+            document.getElementById('add-child-name').value = '';
+            document.getElementById('add-child-phone').value = '';
+            document.getElementById('add-child-email').value = '';
+            document.getElementById('modal-add-child').classList.remove('hidden');
+        }
+
+        async function handleAddChildSubmit(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('add-child-name').value.trim(),
+                phone: document.getElementById('add-child-phone').value.trim(),
+                email: document.getElementById('add-child-email').value.trim()
+            };
+            try {
+                const res = await apiFetch(`${API_BASE}/relationships/parent/create-child`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('add-child-form-section').classList.add('hidden');
+                    document.getElementById('add-child-success-section').classList.remove('hidden');
+                    document.getElementById('new-pairing-code').innerText = data.pairing_code;
+                    document.getElementById('new-pairing-link').dataset.link = data.join_link;
+                    loadParentChildren();
+                } else {
+                    showToast(data.detail || 'Could not create child profile.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error.', 'error');
+            }
+        }
+        
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text);
+            showToast('Code copied to clipboard!', 'success');
+        }
+        function copyLinkToClipboard(elementId) {
+            const text = document.getElementById(elementId).dataset.link;
+            navigator.clipboard.writeText(text);
+            showToast('Link copied to clipboard!', 'success');
+        }
+
+        async function handleSaveMedicine(e) {
+            e.preventDefault();
+            const payload = {
+                child_id: parseInt(document.getElementById('med-form-child-id').value),
+                name: document.getElementById('med-form-name').value,
+                dosage: document.getElementById('med-form-dosage').value,
+                frequency: document.getElementById('med-form-frequency').value,
+                times_of_day: document.getElementById('med-form-times').value,
+                instructions: document.getElementById('med-form-instructions').value,
+                start_date: new Date().toISOString().split('T')[0]
+            };
+
+            try {
+                const res = await apiFetch(`${API_BASE}/parent/medicines`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    showToast('Medicine prescribed and occurrences scheduled!', 'success');
+                    closeModal('modal-medicine');
+                    loadParentDashboard();
+                } else {
+                    const data = await res.json();
+                    showToast(data.detail || 'Could not save medicine.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

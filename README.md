@@ -1,1 +1,92 @@
-# medication-remainder
+# CareSync — Smart Family Medicine Reminder & Monitoring System
+
+> *"Helping families stay connected, one medicine at a time."*
+
+CareSync is a production-grade, healthcare-adjacent web platform designed to eliminate missed medications in families. It bridges Caregivers (Parents) and Patients (Children) through automated multi-dose scheduling, mobile alarm reminders, server-side missed dose detection with real email escalation, camera photo proof capture, and parent verification workflows.
+
+---
+
+## 🌟 Key Features
+
+1. **Dual Role Architecture**:
+   - **Parent Portal**: Multi-column desktop/tablet dashboard for prescriptions, schedule timelines, grace periods, alert centers, and proof verification.
+   - **Child Portal**: Mobile-first, streamlined view with large "Take & Upload Proof" and "Snooze" actions.
+
+2. **Full Production Authentication & Security**:
+   - Argon2/Bcrypt password hashing with complexity rules.
+   - Email verification with expiring tokens.
+   - Password reset workflow.
+   - Persistent `HttpOnly` cookie-based JWT sessions.
+   - IDOR prevention and role-based access control (RBAC).
+
+3. **Family Account Pairing & Invitations**:
+   - Email-based connection invitations requiring mutual acceptance before accessing medication schedules.
+
+4. **Automated Server-Side Missed Dose Scheduler**:
+   - Background worker checks active occurrences every 30 seconds.
+   - If a dose remains unconfirmed past the grace period (e.g., 30 mins), it automatically marks it **MISSED**, sends an in-app emergency alert, and dispatches a critical warning email to the parent.
+   - Duplicate email prevention via `EmailLog` idempotency.
+
+5. **Private Photo Proof Storage & Verification**:
+   - Camera snap and file upload for taking medicine proof.
+   - Stored in private storage (not exposed publicly).
+   - Parent can review proof and click **"Verify"** or **"Request Reconfirmation"**.
+
+6. **Emergency Escalation**:
+   - One-tap **"Call Child"** action (`tel:` dialer link) on missed dose alerts.
+
+---
+
+## 🚀 Quick Start & Local Run
+
+### 1. Requirements
+- Python 3.10+
+- Virtual environment with dependencies from `requirements.txt`
+
+### 2. Environment Configuration (`.env`)
+```ini
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-gmail-app-password
+SMTP_FROM_NAME="CareSync Medicine Alert"
+DATABASE_URL=sqlite:///./medreminder.db
+SECRET_KEY=your-secure-random-secret-key
+```
+
+### 3. Seed Demo Data
+```bash
+python seed_data.py
+```
+* **Parent Account**: `parent@caresync.com` / `CareSync#2026`
+* **Child Account**: `child@caresync.com` / `CareSync#2026`
+
+### 4. Start Server
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+Open **[http://localhost:8000](http://localhost:8000)** in your browser!
+
+### 5. Run Automated Tests
+```bash
+pytest tests/test_caresync.py -v
+```
+
+---
+
+## 🏛️ API Endpoints Summary
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/auth/signup` | Register new Parent or Child |
+| `POST` | `/api/auth/login` | Persistent session login |
+| `POST` | `/api/auth/verify-email` | Verify account email token |
+| `POST` | `/api/auth/forgot-password` | Request password reset email |
+| `POST` | `/api/relationships/parent/request` | Invite child by email |
+| `POST` | `/api/relationships/child/respond` | Accept/Reject connection |
+| `POST` | `/api/parent/medicines` | Prescribe medicine & auto-schedule |
+| `GET` | `/api/child/medicines/today` | Child today's due medicines |
+| `POST` | `/api/medicine-occurrences/{id}/proof` | Child upload photo proof |
+| `POST` | `/api/parent/confirmations/{id}/verify` | Parent verify intake proof |
+| `GET` | `/api/proofs/{id}/view` | Secure private proof image view |
+| `GET` | `/api/notifications` | In-app notification center |

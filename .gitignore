@@ -1,0 +1,38 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+medreminder.db
+test_caresync.db
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+
+# Uploads & User Media (keep folder structure)
+uploads/proofs/*
+!uploads/proofs/.gitkeep
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & Editor files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
