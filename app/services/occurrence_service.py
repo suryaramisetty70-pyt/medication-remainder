@@ -1,5 +1,5 @@
 from datetime import datetime, date, time, timedelta
-from typing import List
+from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.models.medicine import Medicine, MedicineFrequency
 from app.models.occurrence import MedicineOccurrence, OccurrenceStatus
@@ -18,7 +18,7 @@ def parse_time_str(time_str: str) -> time:
 
 
 def generate_occurrences_for_medicine(
-    db: Session, medicine: Medicine, days_ahead: int = 14
+    db: Session, medicine: Medicine, days_ahead: int = 14, from_date: Optional[date] = None
 ) -> List[MedicineOccurrence]:
     """Generates scheduled occurrences for a medicine."""
     parent = db.query(User).filter(User.id == medicine.parent_id).first()
@@ -32,13 +32,15 @@ def generate_occurrences_for_medicine(
     if not start_d:
         start_d = date.today()
 
-    end_d = medicine.end_date or (start_d + timedelta(days=days_ahead))
-    max_d = min(end_d, date.today() + timedelta(days=days_ahead))
+    horizon = date.today() + timedelta(days=days_ahead)
+    max_d = min(medicine.end_date or horizon, horizon)
+    if medicine.frequency == MedicineFrequency.ONCE:
+        max_d = min(max_d, start_d)
 
     now = datetime.now()
     occurrences_created = []
 
-    current_d = start_d
+    current_d = max(start_d, from_date or start_d)
     while current_d <= max_d:
         # Check specific days if set (e.g. MON,WED,FRI)
         if medicine.specific_days:

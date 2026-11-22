@@ -1,4 +1,6 @@
 import os
+import secrets
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,13 +10,13 @@ class Settings(BaseSettings):
     """
     app_name: str = "CareSync"
     app_tagline: str = "Helping families stay connected, one medicine at a time."
-    app_url: str = "http://localhost:8000"
+    app_url: str = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8000")
 
     # Database
     database_url: str = "sqlite:///./medreminder.db"
 
     # Security & JWT
-    secret_key: str = "caresync-jwt-super-secret-key-2026-production"
+    secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(48))
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days persistent session
     refresh_token_expire_days: int = 30

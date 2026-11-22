@@ -62,3 +62,4 @@ class DashboardStatsResponse(BaseModel):
     child_status: str = "Active"
     next_medicine: Optional[OccurrenceResponse] = None
     last_confirmed: Optional[OccurrenceResponse] = None
+    latest_missed: Optional[OccurrenceResponse] = None

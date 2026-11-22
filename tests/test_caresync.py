@@ -276,3 +276,28 @@ def test_08_missed_dose_detection_and_duplicate_prevention():
     assert res2["missed_count"] == 0  # Already MISSED, not processed again
 
     db.close()
+
+
+def test_other_parent_cannot_manage_or_view_child():
+    parent = client.post("/api/auth/signup", json={
+        "name": "Other Parent", "email": "other@example.com", "role": "PARENT",
+        "password": "Password#123", "confirm_password": "Password#123",
+    }).json()
+    headers = {"Authorization": "Bearer " + parent["access_token"]}
+    with TestingSessionLocal() as db:
+        child_id = db.query(User).filter_by(email="john@example.com").one().id
+        medicine_id = db.query(Medicine).filter_by(child_id=child_id).first().id
+    assert client.get("/api/parent/dashboard/stats", params={"child_id": child_id}, headers=headers).status_code == 404
+    assert client.get(f"/api/parent/medicines/{medicine_id}", headers=headers).status_code == 404
+    assert client.delete(f"/api/parent/medicines/{medicine_id}", headers=headers).status_code == 404
+    response = client.post("/api/parent/medicines", headers=headers, json={
+        "child_id": child_id, "name": "Demo", "dosage": "Demo", "times_of_day": "08:00",
+    })
+    assert response.status_code == 403
+
+
+def test_email_without_credentials_reports_failure(monkeypatch):
+    from app.core.config import settings
+    from app.services.email_service import send_raw_email
+    monkeypatch.setattr(settings, "smtp_username", "")
+    assert send_raw_email("parent@example.com", "Alert", "Test message") is False

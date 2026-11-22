@@ -23,7 +23,7 @@ CareSync is a production-grade, healthcare-adjacent web platform designed to eli
    - Email-based connection invitations requiring mutual acceptance before accessing medication schedules.
 
 4. **Automated Server-Side Missed Dose Scheduler**:
-   - Background worker checks active occurrences every 30 seconds.
+   - Background worker checks active occurrences every 10 seconds.
    - If a dose remains unconfirmed past the grace period (e.g., 30 mins), it automatically marks it **MISSED**, sends an in-app emergency alert, and dispatches a critical warning email to the parent.
    - Duplicate email prevention via `EmailLog` idempotency.
 
@@ -54,12 +54,9 @@ DATABASE_URL=sqlite:///./medreminder.db
 SECRET_KEY=your-secure-random-secret-key
 ```
 
-### 3. Seed Demo Data
-```bash
-python seed_data.py
-```
-* **Parent Account**: `parent@caresync.com` / `CareSync#2026`
-* **Child Account**: `child@caresync.com` / `CareSync#2026`
+### 3. Create a family
+
+Use **Create Account** for the parent, add a child, and use the family code in a separate browser session for the child.
 
 ### 4. Start Server
 ```bash
@@ -90,3 +87,12 @@ pytest tests/test_caresync.py -v
 | `POST` | `/api/parent/confirmations/{id}/verify` | Parent verify intake proof |
 | `GET` | `/api/proofs/{id}/view` | Secure private proof image view |
 | `GET` | `/api/notifications` | In-app notification center |
+
+
+## Hosting and alert verification
+
+Use Python 3.12, build with `pip install -r requirements.txt`, start with `sh start.sh`, and check `/api/health`. Set a persistent random `SECRET_KEY`. This release assumes one always-running server and India-local schedules (`TZ=Asia/Kolkata`). Services that sleep cannot process a due alert while asleep. Use persistent storage for both the database and proof images. Point `DATABASE_URL` at a persistent database and `UPLOAD_DIR` at a persistent directory. Set `APP_URL` to the public HTTPS address on hosts other than Render.
+
+Set SMTP credentials and confirm the host permits outbound SMTP with STARTTLS. The health endpoint reports credential presence. Use the parent dashboard's test email and confirm receipt in the intended inbox. In-app notifications work independently of SMTP setup.
+
+For a release check, connect two children and schedule an imminent dose for the second child. Keep the child dashboard open and interact with it to enable browser sound. Leave the dose unconfirmed. After the grace period, verify the parent receives one notification, the banner identifies the correct child, and the email arrives. The worker checks approximately every 10 seconds and the open dashboard refreshes approximately every 15 seconds. Phone sound with a closed browser is outside this implementation.

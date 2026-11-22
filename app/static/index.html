@@ -779,7 +779,7 @@
         let alarmInterval = null;
         let isAlarmPlaying = false;
         let childTodayDoses = [];
-        let lastAlarmTriggeredId = null;
+        const triggeredAlarms = new Set();
 
         // Unlock audio and request notifications on first user gesture
         window.addEventListener('click', () => {
@@ -899,17 +899,13 @@
             if (!currentUser || currentUser.role !== 'CHILD' || !childTodayDoses.length) return;
             const now = new Date();
             for (const d of childTodayDoses) {
-                const isTaken = ['TAKEN', 'TAKEN_LATE', 'PENDING_VERIFICATION', 'VERIFIED'].includes(d.status);
-                if (!isTaken && d.status !== 'MISSED') {
-                    const schedTime = new Date(d.scheduled_time);
-                    // If due or current time >= scheduled time within grace window
-                    if (d.status === 'DUE' || (now >= schedTime && (now - schedTime) < 30 * 60 * 1000)) {
-                        if (lastAlarmTriggeredId !== d.id && !isAlarmPlaying) {
-                            lastAlarmTriggeredId = d.id;
-                            triggerChildAlarm(d);
-                            break;
-                        }
-                    }
+                const key = d.id + '/' + d.scheduled_time;
+                if (['UPCOMING', 'DUE', 'SNOOZED'].includes(d.status) &&
+                    now >= new Date(d.scheduled_time) && now < new Date(d.grace_until) &&
+                    !triggeredAlarms.has(key) && !isAlarmPlaying) {
+                    triggeredAlarms.add(key);
+                    triggerChildAlarm(d);
+                    break;
                 }
             }
         }
@@ -1206,12 +1202,18 @@
                     document.getElementById('stat-missed').innerText = stats.missed_today;
 
                     const missedBanner = document.getElementById('parent-missed-alert-banner');
-                    if (stats.missed_today > 0) {
+                    if (stats.latest_missed) {
+                        const dose = stats.latest_missed;
                         missedBanner.classList.remove('hidden');
-                        document.getElementById('missed-banner-title').innerText = `⚠️ ${stats.child_name || 'Child'} has ${stats.missed_today} Missed Medicine(s)!`;
-                        if (stats.next_medicine && stats.next_medicine.child_phone) {
-                            document.getElementById('btn-call-child').href = `tel:${stats.next_medicine.child_phone}`;
-                            document.getElementById('btn-call-label').innerText = `Call ${stats.child_name || 'Child'} (${stats.next_medicine.child_phone})`;
+                        document.getElementById('missed-banner-title').innerText = dose.child_name + ' did not confirm ' + dose.medicine_name;
+                        document.getElementById('missed-banner-desc').innerText = 'Unconfirmed doses today: ' + stats.missed_today;
+                        const call = document.getElementById('btn-call-child');
+                        call.classList.toggle('hidden', !dose.child_phone);
+                        if (dose.child_phone) {
+                            call.href = 'tel:' + dose.child_phone;
+                            document.getElementById('btn-call-label').innerText = 'Call ' + dose.child_name;
+                        } else {
+                            call.removeAttribute('href');
                         }
                     } else {
                         missedBanner.classList.add('hidden');
@@ -1571,11 +1573,7 @@
                     childTodayDoses = doses;
                     renderChildToday(doses);
 
-                    const dueDose = doses.find(d => d.status === 'DUE');
-                    if (dueDose && !isAlarmPlaying && lastAlarmTriggeredId !== dueDose.id) {
-                        lastAlarmTriggeredId = dueDose.id;
-                        triggerChildAlarm(dueDose);
-                    }
+                    checkChildAlarmsRealtime();
                 }
 
                 // Load completed doses history

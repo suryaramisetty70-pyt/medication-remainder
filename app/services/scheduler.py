@@ -1,6 +1,7 @@
 import asyncio
 import sys
-from datetime import datetime
+from datetime import date, datetime, timedelta
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -8,6 +9,7 @@ from app.models.occurrence import MedicineOccurrence, OccurrenceStatus
 from app.models.notification import Notification, NotificationType
 from app.models.medicine import Medicine
 from app.models.user import User
+from app.services.occurrence_service import generate_occurrences_for_medicine
 from app.services.email_service import send_missed_medicine_alert
 
 
@@ -22,7 +24,7 @@ def check_and_update_occurrences(db: Session) -> dict:
 
     # 1. UPCOMING -> DUE
     upcoming_to_due = (
-        db.query(MedicineOccurrence)
+        db.query(MedicineOccurrence).join(Medicine).filter(Medicine.is_active.is_(True))
         .filter(
             MedicineOccurrence.status == OccurrenceStatus.UPCOMING,
             MedicineOccurrence.scheduled_time <= now,
@@ -53,7 +55,7 @@ def check_and_update_occurrences(db: Session) -> dict:
 
     # 2. DUE / SNOOZED -> MISSED
     overdue_occurrences = (
-        db.query(MedicineOccurrence)
+        db.query(MedicineOccurrence).join(Medicine).filter(Medicine.is_active.is_(True))
         .filter(
             MedicineOccurrence.status.in_([OccurrenceStatus.DUE, OccurrenceStatus.SNOOZED]),
             MedicineOccurrence.grace_until <= now,
@@ -110,10 +112,21 @@ def check_and_update_occurrences(db: Session) -> dict:
 async def scheduler_loop(interval_seconds: int = 30):
     """Async background task that runs the scheduler periodically."""
     print("[SCHEDULER] CareSync Missed Dose Background Worker Started.")
+    last_extended = None
     while True:
         try:
             db = SessionLocal()
             try:
+                today = date.today()
+                if last_extended != today:
+                    latest_dates = dict(db.query(
+                        MedicineOccurrence.medicine_id, func.max(MedicineOccurrence.scheduled_time)
+                    ).group_by(MedicineOccurrence.medicine_id).all())
+                    for medicine in db.query(Medicine).filter_by(is_active=True):
+                        latest = latest_dates.get(medicine.id)
+                        first_day = max(today, latest.date() + timedelta(days=1)) if latest else today
+                        generate_occurrences_for_medicine(db, medicine, from_date=first_day)
+                    last_extended = today
                 check_and_update_occurrences(db)
             finally:
                 db.close()

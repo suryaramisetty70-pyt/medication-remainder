@@ -323,24 +323,16 @@ def get_parent_dashboard_stats(
         MedicineOccurrence.scheduled_time <= today_end,
     )
 
-    target_child = None
+    connections = db.query(ParentChildRelationship).filter_by(
+        parent_id=parent.id, status=RelationshipStatus.ACCEPTED
+    )
     if child_id:
+        connections = connections.filter_by(child_id=child_id)
         query = query.filter(MedicineOccurrence.child_id == child_id)
-        target_child = db.query(User).filter(User.id == child_id).first()
-    else:
-        # Pick the first connected child if available
-        first_rel = (
-            db.query(ParentChildRelationship)
-            .filter(
-                ParentChildRelationship.parent_id == parent.id,
-                ParentChildRelationship.status == RelationshipStatus.ACCEPTED,
-            )
-            .first()
-        )
-        if first_rel:
-            target_child = db.query(User).filter(User.id == first_rel.child_id).first()
-            if target_child:
-                query = query.filter(MedicineOccurrence.child_id == target_child.id)
+    connection = connections.first()
+    if child_id and connection is None:
+        raise HTTPException(status_code=404, detail="Child connection not found.")
+    target_child = db.get(User, connection.child_id) if connection else None
 
     today_occurrences = query.order_by(MedicineOccurrence.scheduled_time.asc()).all()
 
@@ -355,7 +347,9 @@ def get_parent_dashboard_stats(
     next_med = next((o for o in today_occurrences if o.scheduled_time >= now and o.status in [OccurrenceStatus.UPCOMING, OccurrenceStatus.DUE, OccurrenceStatus.SNOOZED]), None)
     last_conf = next((o for o in reversed(today_occurrences) if o.status in [OccurrenceStatus.TAKEN, OccurrenceStatus.VERIFIED, OccurrenceStatus.PENDING_VERIFICATION]), None)
 
+    latest_missed = next((o for o in reversed(today_occurrences) if o.status == OccurrenceStatus.MISSED), None)
     return DashboardStatsResponse(
+        latest_missed=_format_occurrence(latest_missed, db) if latest_missed else None,
         total_today=total_today,
         taken_today=taken_today,
         pending_today=max(0, pending_today),

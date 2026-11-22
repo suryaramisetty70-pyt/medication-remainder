@@ -14,8 +14,7 @@ from app.models.email_log import EmailLog, EmailStatus
 def send_raw_email(to_email: str, subject: str, body_text: str, body_html: Optional[str] = None) -> bool:
     """Send an email over SMTP (TLS on port 587) with plain text and rich HTML."""
     if not settings.smtp_username or not settings.smtp_password:
-        print(f"[DEV MOCK EMAIL] To: {to_email} | Subject: {subject} | Body: {body_text.splitlines()[0]}")
-        return True
+        return False
 
     try:
         msg = MIMEMultipart("alternative")
