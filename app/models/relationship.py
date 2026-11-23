@@ -37,3 +37,10 @@ class ParentChildRelationship(Base):
     parent = relationship("User", foreign_keys=[parent_id], back_populates="parent_relations")
     child = relationship("User", foreign_keys=[child_id], back_populates="child_relations")
 
+
+class FamilyAccess(Base):
+    """Login email for a managed child, separate from account and alert addresses."""
+    __tablename__ = "family_access"
+    relationship_id = Column(Integer, ForeignKey("parent_child_relationships.id"), primary_key=True)
+    login_email = Column(String(255), nullable=False)
+

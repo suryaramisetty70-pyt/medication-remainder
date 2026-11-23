@@ -56,7 +56,7 @@ SECRET_KEY=your-secure-random-secret-key
 
 ### 3. Create a family
 
-Use **Create Account** for the parent, add a child, and use the family code in a separate browser session for the child.
+Use **Create Account** for the parent, then **Connect Child**. Enter the child's name and the parent's preferred login email (defaults to the parent's account email). The child does not need an email account or password. The private family code and chosen email remain visible in the parent's **Child Login Details** section. On the child's device, open **Child Login** and enter both values. The parent can separately save one or more alert email addresses in the emergency alert field; missed-dose notifications go to those addresses, not the family login email.
 
 ### 4. Start Server
 ```bash

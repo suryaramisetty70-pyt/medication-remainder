@@ -214,7 +214,7 @@
                 <div class="flex border-b border-slate-200 pb-2">
                     <button id="tab-login-btn" onclick="switchAuthTab('login')" class="flex-1 pb-2 text-sm font-bold text-center border-b-2 border-brand-600 text-brand-600">Sign In</button>
                     <button id="tab-signup-btn" onclick="switchAuthTab('signup')" class="flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600">Create Account</button>
-                    <button id="tab-joincode-btn" onclick="switchAuthTab('joincode')" class="flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600">Family Code</button>
+                    <button id="tab-joincode-btn" onclick="switchAuthTab('joincode')" class="flex-1 pb-2 text-sm font-bold text-center text-slate-400 hover:text-slate-600">Child Login</button>
                 </div>
 
                 <!-- SIGN IN FORM -->
@@ -292,6 +292,11 @@
 
                 <!-- JOIN WITH CODE FORM -->
                 <form id="form-joincode" onsubmit="handleJoinCodeSubmit(event)" class="space-y-4 hidden">
+                    <p class="text-xs text-slate-500">Enter the email and private code your parent gives you. You do not need your own email account.</p>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Parent Login Email</label>
+                        <input type="email" id="join-email-input" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Parent's chosen email">
+                    </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Family Access Code</label>
                         <input type="text" id="join-code-input" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="e.g. CARE-A7B2">
@@ -365,6 +370,11 @@
             </div>
 
             <!-- URGENT MISSED DOSE ESCALATION BANNER -->
+            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                <h3 class="text-sm font-bold text-slate-900">Child Login Details</h3>
+                <p class="text-xs text-slate-500 mt-1 mb-3">Share these private credentials only with your child. Alert emails are configured separately above.</p>
+                <div id="parent-family-access" class="space-y-2"></div>
+            </div>
             <div id="parent-missed-alert-banner" class="hidden p-5 bg-red-50 border-2 border-red-400 rounded-3xl shadow-lg pulse-alert">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div class="flex items-start space-x-3">
@@ -620,19 +630,15 @@
             </div>
             
             <div id="add-child-form-section">
-                <p class="text-xs text-slate-500 mb-3">Create a profile for your child to generate a pairing code.</p>
+                <p class="text-xs text-slate-500 mb-3">Use your own login email or another email you choose. Your child does not need an email account.</p>
                 <form onsubmit="handleAddChildSubmit(event)" class="space-y-3">
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Child Name *</label>
                         <input type="text" id="add-child-name" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="e.g. Rahul">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Child Phone (Optional)</label>
-                        <input type="tel" id="add-child-phone" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="+91...">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Child Email (Optional)</label>
-                        <input type="email" id="add-child-email" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="child@example.com">
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Parent Login Email *</label>
+                        <input type="email" id="add-child-email" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="parent@example.com">
                     </div>
                     <div class="flex gap-3 pt-2">
                         <button type="button" onclick="closeModal('modal-add-child')" class="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold">Cancel</button>
@@ -647,10 +653,11 @@
                 </div>
                 <div>
                     <div class="text-sm font-bold text-slate-900">Child Profile Created!</div>
-                    <div class="text-xs text-slate-500 mt-1">Use this code on the child's device to connect.</div>
+                    <div class="text-xs text-slate-500 mt-1">Enter both the email and code on your child's device.</div>
                 </div>
                 <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                    <div class="text-2xl font-extrabold tracking-widest text-brand-600" id="new-pairing-code">---</div>
+                    <div class="text-sm font-bold text-slate-700 break-all" id="new-pairing-email">---</div>
+                    <div class="text-base font-extrabold tracking-wide text-brand-600 break-all mt-2" id="new-pairing-code">---</div>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="copyToClipboard('new-pairing-code')" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1"><i class="ph-bold ph-copy"></i> Copy Code</button>
@@ -773,8 +780,8 @@
         window.addEventListener('DOMContentLoaded', async () => {
             await checkAuth();
             const joinCode = new URLSearchParams(window.location.search).get('join');
-            if (joinCode && !currentUser) {
-                document.getElementById('join-code-input').value = joinCode;
+            if ((joinCode || new URLSearchParams(window.location.search).has('family')) && !currentUser) {
+                document.getElementById('join-code-input').value = joinCode || '';
                 switchAuthTab('joincode');
                 history.replaceState(null, '', window.location.pathname);
             }
@@ -1119,11 +1126,12 @@
         async function handleJoinCodeSubmit(e) {
             e.preventDefault();
             const code = document.getElementById('join-code-input').value.trim();
+            const parent_email = document.getElementById('join-email-input').value.trim();
             try {
                 const res = await fetch(`${API_BASE}/relationships/join-code`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pairing_code: code })
+                    body: JSON.stringify({ pairing_code: code, parent_email })
                 });
                 const data = await res.json();
                 if (res.ok) {
@@ -1192,6 +1200,7 @@
         // Load Parent Dashboard Stats & Schedule
         async function loadParentDashboard() {
             if (!currentUser) return;
+            loadParentChildren();
             document.getElementById('parent-greeting').innerText = `Good day, ${currentUser.name}`;
             
             if (!document.getElementById('top-alert-email').value) {
@@ -1438,6 +1447,21 @@
                 const res = await apiFetch(`${API_BASE}/relationships/parent/children`);
                 if (res.ok) {
                     const children = await res.json();
+                    const accessList = document.getElementById('parent-family-access');
+                    accessList.replaceChildren();
+                    for (const c of children.filter(c => c.pairing_code && c.status === 'ACCEPTED')) {
+                        const row = document.createElement('div');
+                        row.className = 'p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center gap-3 justify-between';
+                        const details = document.createElement('div');
+                        details.className = 'text-xs text-slate-700 break-all';
+                        details.textContent = `${c.name} — Email: ${c.pairing_email} | Code: ${c.pairing_code}`;
+                        const copy = document.createElement('button');
+                        copy.className = 'text-xs font-bold text-brand-600';
+                        copy.textContent = 'Copy login details';
+                        copy.onclick = () => navigator.clipboard.writeText(`Email: ${c.pairing_email}\nCode: ${c.pairing_code}`).then(() => showToast('Login details copied!', 'success'));
+                        row.append(details, copy); accessList.append(row);
+                    }
+                    if (!accessList.children.length) accessList.textContent = 'No managed children yet. Click Connect Child.';
                     const list = document.getElementById('parent-children-list');
                     if (children.length === 0) {
                         list.innerHTML = `<div class="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">No children connected yet. Click "+ Invite Child" above.</div>`;
@@ -1982,8 +2006,7 @@
             document.getElementById('add-child-form-section').classList.remove('hidden');
             document.getElementById('add-child-success-section').classList.add('hidden');
             document.getElementById('add-child-name').value = '';
-            document.getElementById('add-child-phone').value = '';
-            document.getElementById('add-child-email').value = '';
+            document.getElementById('add-child-email').value = currentUser.email || '';
             document.getElementById('modal-add-child').classList.remove('hidden');
         }
 
@@ -1991,8 +2014,7 @@
             e.preventDefault();
             const payload = {
                 name: document.getElementById('add-child-name').value.trim(),
-                phone: document.getElementById('add-child-phone').value.trim() || null,
-                email: document.getElementById('add-child-email').value.trim() || null
+                parent_email: document.getElementById('add-child-email').value.trim()
             };
             try {
                 const res = await apiFetch(`${API_BASE}/relationships/parent/create-child`, {
@@ -2005,6 +2027,7 @@
                     document.getElementById('add-child-form-section').classList.add('hidden');
                     document.getElementById('add-child-success-section').classList.remove('hidden');
                     document.getElementById('new-pairing-code').innerText = data.pairing_code;
+                    document.getElementById('new-pairing-email').innerText = data.pairing_email;
                     document.getElementById('new-pairing-link').dataset.link = data.join_link;
                     loadParentChildren();
                 } else {

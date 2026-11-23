@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.deps import get_current_user, get_db, require_child, require_parent
 from app.core.security import create_access_token
 from app.models.notification import Notification, NotificationType
-from app.models.relationship import ParentChildRelationship, RelationshipStatus, generate_pairing_code
+from app.models.relationship import FamilyAccess, ParentChildRelationship, RelationshipStatus, generate_pairing_code
 from app.models.user import User, UserRole
 from app.schemas.relationship import (
     ConnectedUserSummary,
@@ -30,29 +30,21 @@ def create_child_directly(
     parent: User = Depends(require_parent),
     db: Session = Depends(get_db),
 ):
-    """Parent creates a child profile instantly with just name & phone.
-    No email/password needed. Generates a 6-digit pairing code."""
+    """Create a managed child with a private code and a parent-selected email."""
 
     child_name = payload.name.strip()
     if len(child_name) < 2:
         raise HTTPException(status_code=400, detail="Child name must be at least 2 characters.")
 
     child_phone = payload.phone.strip() if payload.phone else None
-    child_email = payload.email.lower().strip() if payload.email else None
-
-    # If email provided, check for existing user
-    if child_email:
-        existing = db.query(User).filter(User.email == child_email).first()
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"An account with email '{child_email}' already exists. Use 'Connect Child' instead."
-            )
+    pairing_email = (payload.parent_email or parent.email or "").lower().strip()
+    if not pairing_email:
+        raise HTTPException(status_code=400, detail="Please provide a parent login email.")
 
     # Create child user profile (no password, email optional)
     child = User(
         name=child_name,
-        email=child_email,
+        email=None,
         hashed_password=None,
         role=UserRole.CHILD,
         phone=child_phone,
@@ -84,6 +76,8 @@ def create_child_directly(
         accepted_at=datetime.utcnow(),
     )
     db.add(rel)
+    db.flush()
+    db.add(FamilyAccess(relationship_id=rel.id, login_email=pairing_email))
     db.commit()
     db.refresh(rel)
     db.refresh(child)
@@ -93,7 +87,8 @@ def create_child_directly(
         "child_id": child.id,
         "child_name": child.name,
         "pairing_code": code,
-        "join_link": f"{settings.app_url}/?join={code}",
+        "pairing_email": pairing_email,
+        "join_link": f"{settings.app_url}/?family=1",
     }
 
 
@@ -105,8 +100,7 @@ def join_by_family_code(
     payload: JoinFamilyCodeInput,
     db: Session = Depends(get_db),
 ):
-    """Child enters a 6-digit family code to access their medicine dashboard.
-    Returns a JWT access token for the child user."""
+    """Authenticate the managed child with the matching email and code."""
 
     code = payload.pairing_code.strip().upper()
     rel = db.query(ParentChildRelationship).filter(
@@ -117,8 +111,14 @@ def join_by_family_code(
     if not rel:
         raise HTTPException(
             status_code=404,
-            detail="Invalid family code. Please check with your parent and try again."
+            detail="Invalid parent email or family code."
         )
+
+    access = db.get(FamilyAccess, rel.id)
+    parent = db.get(User, rel.parent_id)
+    expected = access.login_email if access else (parent.email if parent else None)
+    if not expected or payload.parent_email.lower().strip() != expected.lower().strip():
+        raise HTTPException(status_code=404, detail="Invalid parent email or family code.")
 
     child = db.query(User).filter(User.id == rel.child_id).first()
     if not child or child.hashed_password is not None:
@@ -235,6 +235,7 @@ def get_parent_children(
     for rel in relationships:
         child = db.query(User).filter(User.id == rel.child_id).first()
         if child:
+            access = db.get(FamilyAccess, rel.id)
             results.append(
                 ConnectedUserSummary(
                     relationship_id=rel.id,
@@ -245,6 +246,7 @@ def get_parent_children(
                     role=child.role,
                     status=rel.status,
                     pairing_code=rel.pairing_code if child.hashed_password is None else None,
+                    pairing_email=((access.login_email if access else parent.email) if child.hashed_password is None and rel.pairing_code else None),
                     created_at=rel.created_at,
                     accepted_at=rel.accepted_at,
                 )

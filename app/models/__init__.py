@@ -1,5 +1,5 @@
 from app.models.user import User, UserRole
-from app.models.relationship import ParentChildRelationship, RelationshipStatus
+from app.models.relationship import FamilyAccess, ParentChildRelationship, RelationshipStatus
 from app.models.medicine import Medicine, MedicineFrequency
 from app.models.occurrence import MedicineOccurrence, OccurrenceStatus
 from app.models.proof import MedicineProof
@@ -11,6 +11,7 @@ __all__ = [
     "User",
     "UserRole",
     "ParentChildRelationship",
+    "FamilyAccess",
     "RelationshipStatus",
     "Medicine",
     "MedicineFrequency",

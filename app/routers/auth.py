@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_current_user, get_db
+from app.core.deps import get_current_user, get_db, require_parent
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -22,6 +22,7 @@ from app.schemas.auth import (
     UpdateProfileRequest,
     UserResponse,
     VerifyEmailRequest,
+    normalize_alert_emails,
 )
 from app.services.email_service import (
     send_password_reset_email,
@@ -247,7 +248,7 @@ def update_profile(
 @router.post("/send-test-alert-email")
 def send_test_email(
     payload: dict = None,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_parent),
     db: Session = Depends(get_db),
 ):
     target_email = None
@@ -261,9 +262,18 @@ def send_test_email(
     if not target_email:
         raise HTTPException(status_code=400, detail="No alert email provided or configured.")
 
-    success = send_test_alert_email(db, target_email, user.name)
-    if success:
-        return {"message": f"Test verification email sent successfully to {target_email}!"}
-    else:
-        raise HTTPException(status_code=503, detail=mail_error.get())
+    try:
+        normalized = normalize_alert_emails(target_email)
+        if not normalized:
+            raise ValueError("No email addresses")
+        addresses = normalized.split(", ")
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Enter valid alert email addresses separated by commas.")
+    failures = []
+    for address in addresses:
+        if not send_test_alert_email(db, address, user.name):
+            failures.append(f"{address}: {mail_error.get()}")
+    if failures:
+        raise HTTPException(status_code=503, detail="Some test emails failed: " + "; ".join(failures))
+    return {"message": f"Test email accepted by provider for {len(addresses)} address(es). Check your inbox."}
 

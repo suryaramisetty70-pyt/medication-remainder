@@ -15,14 +15,15 @@ class ConnectionActionInput(BaseModel):
 
 
 class DirectChildCreateInput(BaseModel):
-    """Parent creates a child profile directly — no email/password needed."""
+    """Child needs no personal email or password; parent chooses a login email."""
     name: str
+    parent_email: Optional[EmailStr] = None
     phone: Optional[str] = None
-    email: Optional[EmailStr] = None
 
 
 class JoinFamilyCodeInput(BaseModel):
-    """Child enters 6-digit family code to access their dashboard."""
+    """Child authenticates using the parent-selected email and private code."""
+    parent_email: EmailStr
     pairing_code: str
 
 
@@ -35,6 +36,7 @@ class ConnectedUserSummary(BaseModel):
     role: UserRole
     status: RelationshipStatus
     pairing_code: Optional[str] = None
+    pairing_email: Optional[str] = None
     created_at: datetime
     accepted_at: Optional[datetime] = None
 

@@ -344,16 +344,30 @@ def test_managed_child_pairing_and_missed_email_end_to_end(monkeypatch):
     monkeypatch.setattr(mail, "send_raw_email", accept_email)
     login = client.post("/api/auth/login", json={"email": "sarah@example.com", "password": "Password#123"})
     parent_headers = {"Authorization": "Bearer " + login.json()["access_token"]}
-    created = client.post("/api/relationships/parent/create-child", json={"name": "Managed Child", "email": None, "phone": None}, headers=parent_headers)
+    default_child = client.post("/api/relationships/parent/create-child", json={"name": "Default Email Child", "parent_email": "sarah@example.com"}, headers=parent_headers)
+    assert default_child.status_code == 201
+    default_profile = default_child.json()
+    assert client.post("/api/relationships/join-code", json={"pairing_code": default_profile["pairing_code"], "parent_email": "sarah@example.com"}).status_code == 200
+    created = client.post("/api/relationships/parent/create-child", json={"name": "Managed Child", "parent_email": "shared@example.com"}, headers=parent_headers)
     assert created.status_code == 201
     profile = created.json()
     assert len(profile["pairing_code"]) == 20
+    assert profile["pairing_email"] == "shared@example.com"
     children = client.get("/api/relationships/parent/children", headers=parent_headers).json()
-    assert next(c for c in children if c["user_id"] == profile["child_id"])["pairing_code"] == profile["pairing_code"]
-    child_login = client.post("/api/relationships/join-code", json={"pairing_code": profile["pairing_code"]})
+    child_record = next(c for c in children if c["user_id"] == profile["child_id"])
+    assert child_record["pairing_code"] == profile["pairing_code"]
+    assert child_record["pairing_email"] == "shared@example.com" and child_record["email"] is None
+    assert client.post("/api/relationships/join-code", json={"pairing_code": profile["pairing_code"]}).status_code == 422
+    assert client.post("/api/relationships/join-code", json={"pairing_code": profile["pairing_code"], "parent_email": "wrong@example.com"}).status_code == 404
+    child_login = client.post("/api/relationships/join-code", json={"pairing_code": profile["pairing_code"], "parent_email": "SHARED@example.com"})
     assert child_login.status_code == 200
     assert child_login.json()["user"]["id"] == profile["child_id"]
     child_headers = {"Authorization": "Bearer " + child_login.json()["access_token"]}
+    assert client.put("/api/auth/profile", json={"alert_email": "alerts@example.com, backup@example.com"}, headers=parent_headers).status_code == 200
+    assert client.put("/api/auth/profile", json={"alert_email": "not-an-email"}, headers=parent_headers).status_code == 422
+    test_email = client.post("/api/auth/send-test-alert-email", json={}, headers=parent_headers)
+    assert test_email.status_code == 200
+    assert {m[0] for m in sent} == {"alerts@example.com", "backup@example.com"}
     medicine = client.post("/api/parent/medicines", headers=parent_headers, json={"child_id": profile["child_id"], "name": "Test reminder", "dosage": "Test only", "frequency": "DAILY", "times_of_day": "23:59", "start_date": str(date.today())})
     assert medicine.status_code == 201
     with TestingSessionLocal() as db:
@@ -366,7 +380,7 @@ def test_managed_child_pairing_and_missed_email_end_to_end(monkeypatch):
         check_and_update_occurrences(db)
         assert db.get(MedicineOccurrence, occ.id).status == OccurrenceStatus.MISSED
         messages = [m for m in sent if "Managed Child" in m[1]]
-        assert len(messages) == 1 and messages[0][0] == "sarah@example.com"
-        assert db.query(EmailLog).filter_by(reference_id=f"missed_occ_{occ.id}", status=EmailStatus.SENT).count() == 1
+        assert len(messages) == 2 and {m[0] for m in messages} == {"alerts@example.com", "backup@example.com"}
+        assert db.query(EmailLog).filter_by(reference_id=f"missed_occ_{occ.id}", status=EmailStatus.SENT).count() == 2
         assert db.query(Notification).filter_by(user_id=occ.parent_id, type=NotificationType.MEDICINE_MISSED).count() >= 1
     assert client.get("/api/child/medicines/today", headers=child_headers).status_code == 200

@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, TypeAdapter, field_validator
 from app.models.user import UserRole
 
 
@@ -117,3 +117,18 @@ class UpdateProfileRequest(BaseModel):
     alert_email: Optional[str] = None
     grace_period_minutes: Optional[int] = None
     require_photo_proof: Optional[bool] = None
+
+    @field_validator("alert_email")
+    @classmethod
+    def validate_alert_email(cls, value):
+        if value is None:
+            return None
+        return normalize_alert_emails(value)
+
+
+def normalize_alert_emails(value: str) -> str:
+    addresses = list(dict.fromkeys(TypeAdapter(EmailStr).validate_python(item.strip()).lower() for item in value.split(",") if item.strip()))
+    result = ", ".join(addresses)
+    if len(result) > 255:
+        raise ValueError("Alert email list must be 255 characters or less.")
+    return result
