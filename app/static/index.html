@@ -9,7 +9,7 @@
     <!-- Google Fonts & Phosphor Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script>
         tailwind.config = {
@@ -20,14 +20,14 @@
                     },
                     colors: {
                         brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            200: '#bae6fd',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            800: '#075985',
-                            900: '#0c4a6e',
+                            50: '#edf9f5',
+                            100: '#d6f2e7',
+                            200: '#a9e4cf',
+                            500: '#20947b',
+                            600: '#137a66',
+                            700: '#126353',
+                            800: '#114b40',
+                            900: '#123c34',
                         },
                     }
                 }
@@ -43,6 +43,7 @@
         }
         .pulse-alert { animation: pulse-ring 2s infinite; }
     </style>
+    <link rel="stylesheet" href="/static/care-design.css">
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col bg-slate-50">
 
@@ -50,7 +51,7 @@
     <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <!-- Brand Logo -->
-            <div class="flex items-center space-x-3 cursor-pointer" onclick="navigate('landing')">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="navigate(currentUser ? (currentUser.role === 'PARENT' ? 'parent' : 'child') : 'landing')">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 to-brand-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
                     <i class="ph-bold ph-heartbeat text-2xl"></i>
                 </div>
@@ -64,8 +65,8 @@
             <div class="flex items-center space-x-3">
                 <!-- Live Scheduler Indicator -->
                 <div class="hidden md:flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-semibold">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    <span>Live Background Engine</span>
+                    <i class="ph-bold ph-heartbeat"></i>
+                    <span>Care, connected.</span>
                 </div>
 
                 <!-- Unauthenticated Nav -->
@@ -121,94 +122,72 @@
         <!-- ============================================== -->
         <!-- 1. LANDING PAGE -->
         <!-- ============================================== -->
-        <section id="view-landing" class="view-section py-6 sm:py-12 space-y-12">
+        <section id="view-landing" class="view-section landing-shell">
             <!-- Hero -->
-            <div class="text-center max-w-3xl mx-auto space-y-5">
-                <div class="inline-flex items-center space-x-2 bg-brand-50 border border-brand-200 px-4 py-1.5 rounded-full text-xs font-bold text-brand-700">
-                    <i class="ph-fill ph-shield-check"></i>
-                    <span>Healthcare-Grade Family Medicine Bridge</span>
-                </div>
-                <h1 class="text-4xl sm:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                    Never Miss the Moment <br><span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-teal-500">That Matters.</span>
-                </h1>
-                <p class="text-base sm:text-lg text-slate-600 leading-relaxed">
-                    CareSync bridges parents and children with scheduled medicine alarms, automated missed dose escalation, real email alerts, and photo proof verification.
-                </p>
+            <div class="care-hero">
+                <div class="hero-copy">
+                <div class="hero-eyebrow"><span class="eyebrow-mark"><i class="ph-bold ph-heartbeat"></i></span> A BETTER WAY TO CARE</div>
+                <h1>Closer care.<br> <span>Healthier days.</span></h1>
+                <p>Stay connected to the people you love. Schedule medicines, confirm doses, and receive missed-dose alerts — all in one thoughtfully designed space.</p>
 
                 <!-- Quick Action Buttons -->
-                <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    <button onclick="navigate('auth'); switchAuthTab('signup');" class="px-6 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-lg shadow-brand-500/25 transition text-sm flex items-center space-x-2">
-                        <span>Create Your Account</span>
-                        <i class="ph-bold ph-arrow-right"></i>
+                <div class="hero-actions">
+                    <button onclick="navigate('auth'); switchAuthTab('signup');" class="hero-primary">
+                        <span>Get started</span><i class="ph-bold ph-plus"></i>
                     </button>
-                    <button onclick="navigate('auth'); switchAuthTab('login');" class="px-6 py-3.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl font-bold transition text-sm">
-                        Sign In
+                    <button onclick="switchAuthTab('joincode');" class="hero-secondary">
+                        <i class="ph-bold ph-device-mobile"></i> Child login
                     </button>
                 </div>
-
-                <!-- Live System Trust & Capability Badges -->
-                <div class="mt-8 p-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm max-w-2xl mx-auto text-left">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="flex items-center space-x-3 p-2">
-                            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                <i class="ph-bold ph-envelope-simple text-lg"></i>
-                            </div>
-                            <div>
-                                <div class="text-xs font-bold text-slate-800">Direct Email Alerts</div>
-                                <div class="text-[11px] text-slate-500">Real-time missed dose escalation</div>
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-3 p-2">
-                            <div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                                <i class="ph-bold ph-camera text-lg"></i>
-                            </div>
-                            <div>
-                                <div class="text-xs font-bold text-slate-800">Photo Proof Intake</div>
-                                <div class="text-[11px] text-slate-500">Secure camera verification</div>
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-3 p-2">
-                            <div class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                                <i class="ph-bold ph-shield-check text-lg"></i>
-                            </div>
-                            <div>
-                                <div class="text-xs font-bold text-slate-800">100% Private & Live</div>
-                                <div class="text-[11px] text-slate-500">Encrypted relational storage</div>
-                            </div>
-                        </div>
+                <div class="hero-note"><i class="ph-bold ph-lock-key"></i> Designed for families, built around everyday routines.</div>
+                </div>
+                <div class="hero-visual" aria-label="Illustrative preview of today's medication dashboard">
+                    <div class="visual-orbit orbit-a"></div><div class="visual-orbit orbit-b"></div>
+                    <div class="preview-board">
+                        <div class="preview-header"><div class="preview-logo"><i class="ph-bold ph-heartbeat"></i></div><div><strong>My care plan</strong><small>Today's overview</small></div><span class="preview-tag">PREVIEW</span></div>
+                        <div class="preview-progress"><div><small>DAILY PROGRESS</small><strong>On track.</strong><span>2 of 3 doses confirmed</span></div><div class="preview-ring"><b>67%</b></div></div>
+                        <div class="preview-item"><span class="preview-icon"><i class="ph-bold ph-pill"></i></span><div><strong>Morning dose</strong><small>08:00 AM</small></div><span class="preview-done"><i class="ph-bold ph-check-circle"></i> Taken</span></div>
+                        <div class="preview-item"><span class="preview-icon"><i class="ph-bold ph-pill"></i></span><div><strong>Afternoon dose</strong><small>01:00 PM</small></div><span class="preview-done"><i class="ph-bold ph-check-circle"></i> Taken</span></div>
+                        <div class="preview-item"><span class="preview-icon amber"><i class="ph-bold ph-clock"></i></span><div><strong>Evening dose</strong><small>07:00 PM</small></div><span class="preview-wait">Upcoming</span></div>
                     </div>
+                    <div class="floating-note note-top"><span class="float-icon"><i class="ph-bold ph-check-circle"></i></span><div><strong>Dose confirmed</strong><small>Family stays connected</small></div></div>
+                    <div class="floating-note note-bottom"><span class="float-icon mail"><i class="ph-bold ph-envelope-simple"></i></span><div><strong>Missed-dose alerts</strong><small>Sent to your chosen inbox</small></div></div>
                 </div>
             </div>
 
             <!-- Workflow Highlights -->
-            <div class="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="landing-features"><div class="section-kicker">ONE CONNECTED EXPERIENCE</div><h2>Everything your family needs.</h2><p>Simple routines, clear confirmations, and peace of mind.</p>
+            <div class="feature-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-calendar-plus"></i></div>
-                    <h3 class="font-bold text-slate-800 text-sm">1. Parent Schedules</h3>
+                    <h3 class="font-bold text-slate-800 text-sm">Plan their routine</h3>
                     <p class="text-xs text-slate-500 mt-1">Parent sets dosage, timing, and custom instructions for the child.</p>
                 </div>
                 <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-bell-ringing"></i></div>
-                    <h3 class="font-bold text-slate-800 text-sm">2. Child Reminder Alarm</h3>
-                    <p class="text-xs text-slate-500 mt-1">Child receives alarm chime and notification at scheduled medicine time.</p>
+                    <h3 class="font-bold text-slate-800 text-sm">Stay on schedule</h3>
+                    <p class="text-xs text-slate-500 mt-1">Children see their scheduled doses and in-app reminders.</p>
                 </div>
                 <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-camera"></i></div>
-                    <h3 class="font-bold text-slate-800 text-sm">3. Photo Proof Upload</h3>
+                    <h3 class="font-bold text-slate-800 text-sm">Confirm with care</h3>
                     <p class="text-xs text-slate-500 mt-1">Child confirms dose and snaps photo proof stored securely in private storage.</p>
                 </div>
                 <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mb-3 text-xl"><i class="ph-bold ph-warning-octagon"></i></div>
-                    <h3 class="font-bold text-slate-800 text-sm">4. Missed Dose Warning</h3>
-                    <p class="text-xs text-slate-500 mt-1">If unconfirmed past grace period, warning email and Call Child action trigger instantly.</p>
+                    <h3 class="font-bold text-slate-800 text-sm">Know when to check in</h3>
+                    <p class="text-xs text-slate-500 mt-1">Receive a missed-dose email after the grace period.</p>
                 </div>
             </div>
+            </div>
+            <footer class="landing-footer"><span>CareSync · Family medication management</span><span>Made for the people who care.</span></footer>
         </section>
 
         <!-- ============================================== -->
         <!-- 2. AUTHENTICATION (SIGNUP & SIGNIN) -->
         <!-- ============================================== -->
-        <section id="view-auth" class="view-section hidden max-w-md mx-auto py-8">
+        <section id="view-auth" class="view-section hidden auth-shell">
+            <aside class="auth-aside"><div class="auth-symbol"><i class="ph-bold ph-heartbeat"></i></div><span class="section-kicker">CARE STARTS HERE</span><h2>One small step.<br>More peace of mind.</h2><p>Connect your family, simplify medication routines and stay informed.</p><div class="auth-aside-detail"><i class="ph-bold ph-lock-key"></i> Your family's space</div></aside>
             <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
                 <!-- Tabs -->
                 <div class="flex border-b border-slate-200 pb-2">
@@ -313,9 +292,9 @@
         <!-- ============================================== -->
         <!-- 3. PARENT PORTAL -->
         <!-- ============================================== -->
-        <section id="view-parent" class="view-section hidden space-y-6">
+        <section id="view-parent" class="view-section hidden dashboard-shell">
             <!-- EMERGENCY ALERT EMAIL & VERIFICATION BAR -->
-            <div class="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200 rounded-3xl p-4 sm:p-5 mb-2 shadow-sm space-y-3">
+            <div class="alert-channel bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200 rounded-3xl p-4 sm:p-5 mb-2 shadow-sm space-y-3">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div class="flex items-center space-x-3">
                         <div class="w-9 h-9 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-md shadow-blue-500/20">
@@ -325,7 +304,7 @@
                             <div class="flex items-center gap-2">
                                 <h4 class="text-xs font-extrabold uppercase tracking-wider text-blue-900">Emergency Alert Notification Channel</h4>
                                 <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
-                                    <i class="ph-bold ph-shield-check"></i> Active
+                                    <i class="ph-bold ph-envelope-simple"></i> Email settings
                                 </span>
                             </div>
                             <p class="text-[11px] text-blue-700 mt-0.5">Missed dose urgent warnings & photo proof submissions will be delivered to these email inboxes.</p>
@@ -351,7 +330,7 @@
             </div>
 
             <!-- Subheader Banner -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <div class="dashboard-heading flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                 <div>
                     <div class="text-xs font-bold uppercase tracking-wider text-brand-600">Caregiver Control Center</div>
                     <h2 class="text-2xl font-extrabold text-slate-900" id="parent-greeting">Good day, Parent</h2>
@@ -370,7 +349,7 @@
             </div>
 
             <!-- URGENT MISSED DOSE ESCALATION BANNER -->
-            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+            <div class="family-access-panel bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
                 <h3 class="text-sm font-bold text-slate-900">Child Login Details</h3>
                 <p class="text-xs text-slate-500 mt-1 mb-3">Share these private credentials only with your child. Alert emails are configured separately above.</p>
                 <div id="parent-family-access" class="space-y-2"></div>
@@ -397,7 +376,7 @@
             </div>
 
             <!-- STATS OVERVIEW CARDS -->
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="dashboard-stats grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                     <div class="text-xs font-bold text-slate-400 uppercase">Today's Total</div>
                     <div class="text-3xl font-extrabold text-slate-900 mt-1" id="stat-total">0</div>
@@ -419,9 +398,10 @@
                     <div class="text-[11px] text-slate-500 mt-1">Escalated alerts</div>
                 </div>
             </div>
+            <div class="today-progress"><div class="progress-icon"><i class="ph-bold ph-chart-donut"></i></div><div class="progress-copy"><strong>Today's care progress</strong><span id="parent-progress-label">Loading today's plan…</span></div><div class="progress-track" role="progressbar" aria-label="Today's completed doses" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="parent-progress-track"><div id="parent-progress-fill"></div></div><strong class="progress-value" id="parent-progress-value">—</strong></div>
 
             <!-- SUBTABS NAVIGATION -->
-            <div class="border-b border-slate-200 flex space-x-6 overflow-x-auto pb-1">
+            <div class="dashboard-tabs border-b border-slate-200 flex space-x-6 overflow-x-auto pb-1">
                 <button onclick="switchParentSubTab('schedule')" id="ptab-schedule-btn" class="pb-3 text-sm font-bold text-brand-600 border-b-2 border-brand-600 whitespace-nowrap">Today's Schedule</button>
                 <button onclick="switchParentSubTab('medicines')" id="ptab-medicines-btn" class="pb-3 text-sm font-bold text-slate-400 hover:text-slate-600 whitespace-nowrap">Prescriptions</button>
                 <button onclick="switchParentSubTab('children')" id="ptab-children-btn" class="pb-3 text-sm font-bold text-slate-400 hover:text-slate-600 whitespace-nowrap">Connected Family</button>
@@ -507,9 +487,9 @@
         <!-- ============================================== -->
         <!-- 4. CHILD PORTAL (MOBILE-OPTIMIZED) -->
         <!-- ============================================== -->
-        <section id="view-child" class="view-section hidden max-w-lg mx-auto space-y-6">
+        <section id="view-child" class="view-section hidden child-shell mx-auto space-y-6">
             <!-- Greeting Header -->
-            <div class="bg-gradient-to-br from-brand-600 to-brand-800 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
+            <div class="child-heading bg-gradient-to-br from-brand-600 to-brand-800 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
                 <div class="relative z-10">
                     <div class="text-xs uppercase font-bold text-brand-200 tracking-wider">Patient Portal</div>
                     <h2 class="text-2xl font-extrabold mt-0.5" id="child-greeting">Welcome 👋</h2>
@@ -519,6 +499,7 @@
 
             <!-- PENDING CONNECTION REQUESTS BANNER FOR CHILD -->
             <div id="child-pending-requests-banner" class="hidden space-y-2"></div>
+            <div class="today-progress child-progress"><div class="progress-icon"><i class="ph-bold ph-check-circle"></i></div><div class="progress-copy"><strong>Your daily progress</strong><span id="child-progress-label">Loading your plan…</span></div><div class="progress-track" role="progressbar" aria-label="Your completed doses" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="child-progress-track"><div id="child-progress-fill"></div></div><strong class="progress-value" id="child-progress-value">—</strong></div>
 
             <!-- TODAY'S MEDICINES -->
             <div class="space-y-4">
@@ -1037,6 +1018,14 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        function updateCareProgress(prefix, completed, total) {
+            const percentage = total ? Math.round(Math.max(0, Math.min(1, completed / total)) * 100) : 0;
+            document.getElementById(`${prefix}-progress-label`).textContent = total ? `${completed} of ${total} doses confirmed` : 'No doses scheduled today';
+            document.getElementById(`${prefix}-progress-fill`).style.width = `${percentage}%`;
+            document.getElementById(`${prefix}-progress-track`).setAttribute('aria-valuenow', String(percentage));
+            document.getElementById(`${prefix}-progress-value`).textContent = total ? `${percentage}%` : '—';
+        }
+
         function switchAuthTab(tab) {
             const isLogin = tab === 'login';
             const isSignup = tab === 'signup';
@@ -1215,6 +1204,7 @@
                     document.getElementById('stat-taken').innerText = stats.taken_today;
                     document.getElementById('stat-pending').innerText = stats.pending_today;
                     document.getElementById('stat-missed').innerText = stats.missed_today;
+                    updateCareProgress('parent', stats.taken_today, stats.total_today);
 
                     const missedBanner = document.getElementById('parent-missed-alert-banner');
                     if (stats.latest_missed) {
@@ -1601,6 +1591,7 @@
                 if (res.ok) {
                     const doses = await res.json();
                     childTodayDoses = doses;
+                    updateCareProgress('child', doses.filter(d => ['TAKEN','TAKEN_LATE','VERIFIED','PENDING_VERIFICATION'].includes(d.status)).length, doses.length);
                     renderChildToday(doses);
 
                     checkChildAlarmsRealtime();
