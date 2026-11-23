@@ -264,5 +264,5 @@ def send_test_email(
     if success:
         return {"message": f"Test verification email sent successfully to {target_email}!"}
     else:
-        raise HTTPException(status_code=503, detail="Email could not be sent. Check SMTP settings.")
+        raise HTTPException(status_code=503, detail="Email could not be sent. Check the email provider settings.")
 

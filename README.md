@@ -96,3 +96,7 @@ Use Python 3.12, build with `pip install -r requirements.txt`, start with `sh st
 Set SMTP credentials and confirm the host permits outbound SMTP with STARTTLS. The health endpoint reports credential presence. Use the parent dashboard's test email and confirm receipt in the intended inbox. In-app notifications work independently of SMTP setup.
 
 For a release check, connect two children and schedule an imminent dose for the second child. Keep the child dashboard open and interact with it to enable browser sound. Leave the dose unconfirmed. After the grace period, verify the parent receives one notification, the banner identifies the correct child, and the email arrives. The worker checks approximately every 10 seconds and the open dashboard refreshes approximately every 15 seconds. Phone sound with a closed browser is outside this implementation.
+
+### Email on Render Free
+
+Set `RESEND_API_KEY` and `EMAIL_FROM` in the service environment to send email over HTTPS. Use a verified sender for real families. For an initial test, `onboarding@resend.dev` can send to the address registered to your Resend account. After deployment, check `email_configured` at `/api/health`, then verify the missed-dose email in the parent inbox.

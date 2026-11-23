@@ -5,6 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
 
+import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -12,7 +13,26 @@ from app.models.email_log import EmailLog, EmailStatus
 
 
 def send_raw_email(to_email: str, subject: str, body_text: str, body_html: Optional[str] = None) -> bool:
-    """Send an email over SMTP (TLS on port 587) with plain text and rich HTML."""
+    """Return success when the configured mail provider accepts the message."""
+    if settings.resend_api_key:
+        if not settings.email_from:
+            return False
+        message = {"from": settings.email_from, "to": [to_email], "subject": subject, "text": body_text}
+        if body_html:
+            message["html"] = body_html
+        try:
+            response = httpx.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                json=message,
+                timeout=12,
+            )
+            response.raise_for_status()
+            return bool(response.json().get("id"))
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            print(f"[EMAIL ERROR] Resend request failed: {type(exc).__name__}", file=sys.stderr)
+            return False
+
     if not settings.smtp_username or not settings.smtp_password:
         return False
 
@@ -53,7 +73,7 @@ def log_and_send_email(
         email_type=email_type,
         reference_id=reference_id,
         status=EmailStatus.SENT if success else EmailStatus.FAILED,
-        error=None if success else "SMTP delivery failure",
+        error=None if success else "Email provider did not accept the message",
         sent_at=datetime.utcnow(),
     )
     db.add(log_entry)

@@ -90,6 +90,7 @@ def health_check():
         "status": "healthy",
         "app": settings.app_name,
         "tagline": settings.app_tagline,
+        "email_configured": bool(settings.email_from) if settings.resend_api_key else bool(settings.smtp_username and settings.smtp_password),
         "smtp_configured": bool(settings.smtp_username and settings.smtp_password),
     }
 

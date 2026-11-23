@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_name: str = "CareSync Medicine Alert"
     email_from: str = ""
+    resend_api_key: str = ""
 
     # File Storage
     upload_dir: str = "uploads/proofs"
