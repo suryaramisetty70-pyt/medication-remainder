@@ -1,6 +1,8 @@
+from contextvars import ContextVar
+from uuid import uuid4
 import smtplib
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -9,29 +11,59 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.email_log import EmailLog, EmailStatus
+from app.models.email_log import EmailLog, EmailStatus, PendingMissedEmail
+from app.models.occurrence import MedicineOccurrence, OccurrenceStatus
+
+mail_error = ContextVar("mail_error", default="Email provider is not configured.")
+retryable = ContextVar("mail_retryable", default=False)
 
 
-def send_raw_email(to_email: str, subject: str, body_text: str, body_html: Optional[str] = None) -> bool:
+def send_raw_email(to_email: str, subject: str, body_text: str, body_html: Optional[str] = None, *, delivery_key: Optional[str] = None) -> bool:
     """Return success when the configured mail provider accepts the message."""
+    mail_error.set("Email provider is not configured.")
+    retryable.set(False)
     if settings.resend_api_key:
         if not settings.email_from:
             return False
         message = {"from": settings.email_from, "to": [to_email], "subject": subject, "text": body_text}
         if body_html:
             message["html"] = body_html
+        headers = {"Authorization": f"Bearer {settings.resend_api_key.strip()}"}
+        if delivery_key:
+            headers["Idempotency-Key"] = delivery_key
         try:
             response = httpx.post(
                 "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                headers=headers,
                 json=message,
                 timeout=12,
             )
             response.raise_for_status()
             return bool(response.json().get("id"))
+        except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code
+            try:
+                info = exc.response.json()
+                message = str(info.get("message", "")).lower()
+            except (ValueError, AttributeError):
+                message = ""
+            if "testing emails" in message or "own email address" in message:
+                hint = "The test sender can only email the Resend account owner. Verify a sender domain to email other parents."
+            elif "domain" in message:
+                hint = "Verify the sender domain in Resend and check EMAIL_FROM."
+            elif "api key" in message or code == 401:
+                hint = "Check that RESEND_API_KEY is active and has permission to send email."
+            elif code == 429:
+                hint = "Resend rate or quota limit reached."
+            else:
+                hint = "Check the failed send in Resend Logs."
+            mail_error.set(f"Resend HTTP {code}. {hint}")
+            retryable.set(code == 429 or code >= 500)
         except (httpx.HTTPError, ValueError, AttributeError) as exc:
-            print(f"[EMAIL ERROR] Resend request failed: {type(exc).__name__}", file=sys.stderr)
-            return False
+            mail_error.set(f"Email provider connection or response error ({type(exc).__name__}).")
+            retryable.set(True)
+        print(mail_error.get(), file=sys.stderr)
+        return False
 
     if not settings.smtp_username or not settings.smtp_password:
         return False
@@ -52,7 +84,8 @@ def send_raw_email(to_email: str, subject: str, body_text: str, body_html: Optio
             server.sendmail(settings.smtp_username, to_email, msg.as_string())
         return True
     except Exception as exc:
-        print(f"[EMAIL ERROR] Failed sending to {to_email}: {exc}", file=sys.stderr)
+        mail_error.set(f"SMTP send failed ({type(exc).__name__}).")
+        retryable.set(isinstance(exc, OSError) and not isinstance(exc, smtplib.SMTPAuthenticationError))
         return False
 
 
@@ -73,7 +106,7 @@ def log_and_send_email(
         email_type=email_type,
         reference_id=reference_id,
         status=EmailStatus.SENT if success else EmailStatus.FAILED,
-        error=None if success else "Email provider did not accept the message",
+        error=None if success else mail_error.get(),
         sent_at=datetime.utcnow(),
     )
     db.add(log_entry)
@@ -173,7 +206,7 @@ def send_connection_request_email(db: Session, child_email: str, child_name: str
     return log_and_send_email(db, child_email, subject, body_text, body_html, "CONNECTION_REQUEST")
 
 
-def send_missed_medicine_alert(
+def queue_missed_medicine_alert(
     db: Session,
     parent_alert_email: str,
     parent_name: str,
@@ -183,23 +216,8 @@ def send_missed_medicine_alert(
     dosage: str,
     scheduled_time: str,
     occurrence_id: int,
-) -> bool:
-    """
-    Sends the critical missed medicine alert to the configured parent alert email(s).
-    Supports multiple comma-separated emails (e.g., 'parent1@test.com, parent2@test.com').
-    Includes duplicate suppression via EmailLog check.
-    """
-    # Check if already sent for this occurrence
-    ref_id = f"missed_occ_{occurrence_id}"
-    already_sent = db.query(EmailLog).filter(
-        EmailLog.reference_id == ref_id,
-        EmailLog.status == EmailStatus.SENT
-    ).first()
-
-    if already_sent:
-        print(f"[SUPPRESSED] Missed alert already sent for occurrence {occurrence_id}")
-        return True
-
+) -> None:
+    """Queue one message per recipient in the same transaction as the parent notification."""
     subject = f"⚠️ CareSync Alert — Medicine Missed by {child_name}"
     call_link = f"tel:{child_phone}" if child_phone else f"{settings.app_url}/parent/dashboard"
     call_label = f"Call {child_name} ({child_phone})" if child_phone else f"View {child_name}'s Status"
@@ -276,13 +294,32 @@ def send_missed_medicine_alert(
     </html>
     """
     
-    recipients = [e.strip() for e in parent_alert_email.split(",") if e.strip()]
-    sent_any = False
-    for r_email in recipients:
-        success = log_and_send_email(db, r_email, subject, body_text, body_html, "MEDICINE_MISSED", ref_id)
-        if success:
-            sent_any = True
-    return sent_any
+    for recipient in dict.fromkeys(e.strip().lower() for e in parent_alert_email.split(",") if e.strip()):
+        db.add(PendingMissedEmail(key=str(uuid4()), occurrence_id=occurrence_id, recipient=recipient,
+                                  subject=subject, body=body_text, html=body_html))
+
+
+def deliver_pending_alerts(db: Session):
+    now = datetime.utcnow()
+    pending = db.query(PendingMissedEmail).filter(PendingMissedEmail.next_attempt <= now).order_by(
+        PendingMissedEmail.next_attempt).limit(20).all()
+    for job in pending:
+        occurrence = db.get(MedicineOccurrence, job.occurrence_id)
+        if not occurrence or occurrence.status != OccurrenceStatus.MISSED or now - job.created_at > timedelta(hours=1):
+            db.delete(job)
+            db.commit()
+            continue
+        ok = send_raw_email(job.recipient, job.subject, job.body, job.html, delivery_key=job.key)
+        job.attempts += 1
+        db.add(EmailLog(recipient=job.recipient, email_type="MEDICINE_MISSED",
+                        reference_id=f"missed_occ_{job.occurrence_id}",
+                        status=EmailStatus.SENT if ok else EmailStatus.FAILED,
+                        error=None if ok else mail_error.get()))
+        if not ok and retryable.get() and job.attempts < 5:
+            job.next_attempt = datetime.utcnow() + timedelta(seconds=30 * 2 ** (job.attempts - 1))
+        else:
+            db.delete(job)
+        db.commit()
 
 
 def send_proof_uploaded_email(

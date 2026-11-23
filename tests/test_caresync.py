@@ -301,3 +301,35 @@ def test_email_without_credentials_reports_failure(monkeypatch):
     from app.services.email_service import send_raw_email
     monkeypatch.setattr(settings, "smtp_username", "")
     assert send_raw_email("parent@example.com", "Alert", "Test message") is False
+
+
+def test_missed_email_retries_with_same_key_after_restart(monkeypatch):
+    import httpx
+    from app.services import email_service as mail
+    from app.models.email_log import PendingMissedEmail
+
+    monkeypatch.setattr(mail.settings, "resend_api_key", "test-key")
+    monkeypatch.setattr(mail.settings, "email_from", "sender@example.com")
+    keys = []
+
+    def send(url, *, headers, json, timeout):
+        keys.append(headers["Idempotency-Key"])
+        code = 429 if len(keys) == 1 else 200
+        return httpx.Response(code, json={"id": "accepted"}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(mail.httpx, "post", send)
+    with TestingSessionLocal() as db:
+        occ = db.query(MedicineOccurrence).filter_by(status=OccurrenceStatus.MISSED).first()
+        mail.queue_missed_medicine_alert(db, "retry@example.com", "Parent", "Child", None,
+                                        "Demo", "Demo", "08:00", occ.id)
+        db.commit()
+        mail.deliver_pending_alerts(db)
+        job = db.query(PendingMissedEmail).filter_by(recipient="retry@example.com").one()
+        assert job.attempts == 1
+        job.next_attempt = datetime.utcnow() - timedelta(seconds=1)
+        db.commit()
+    with TestingSessionLocal() as db:
+        mail.deliver_pending_alerts(db)
+        mail.deliver_pending_alerts(db)
+        assert len(keys) == 2 and keys[0] == keys[1]
+        assert db.query(EmailLog).filter_by(recipient="retry@example.com", status=EmailStatus.SENT).count() == 1

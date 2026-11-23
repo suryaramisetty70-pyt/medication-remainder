@@ -26,6 +26,7 @@ from app.schemas.auth import (
 from app.services.email_service import (
     send_password_reset_email,
     send_test_alert_email,
+    mail_error,
     send_verification_email,
 )
 
@@ -264,5 +265,5 @@ def send_test_email(
     if success:
         return {"message": f"Test verification email sent successfully to {target_email}!"}
     else:
-        raise HTTPException(status_code=503, detail="Email could not be sent. Check the email provider settings.")
+        raise HTTPException(status_code=503, detail=mail_error.get())
 

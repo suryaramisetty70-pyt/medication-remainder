@@ -10,7 +10,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.medicine import Medicine
 from app.models.user import User
 from app.services.occurrence_service import generate_occurrences_for_medicine
-from app.services.email_service import send_missed_medicine_alert
+from app.services.email_service import queue_missed_medicine_alert, deliver_pending_alerts
 
 
 def check_and_update_occurrences(db: Session) -> dict:
@@ -91,7 +91,7 @@ def check_and_update_occurrences(db: Session) -> dict:
 
         # Send Real Warning Email to Parent
         if alert_email:
-            send_missed_medicine_alert(
+            queue_missed_medicine_alert(
                 db=db,
                 parent_alert_email=alert_email,
                 parent_name=parent_name,
@@ -106,7 +106,27 @@ def check_and_update_occurrences(db: Session) -> dict:
     if overdue_occurrences:
         db.commit()
 
+    deliver_pending_alerts(db)
     return results
+
+
+def run_cycle(last_extended):
+    db = SessionLocal()
+    try:
+        today = date.today()
+        if last_extended != today:
+            latest_dates = dict(db.query(
+                MedicineOccurrence.medicine_id, func.max(MedicineOccurrence.scheduled_time)
+            ).group_by(MedicineOccurrence.medicine_id).all())
+            for medicine in db.query(Medicine).filter_by(is_active=True):
+                latest = latest_dates.get(medicine.id)
+                first_day = max(today, latest.date() + timedelta(days=1)) if latest else today
+                generate_occurrences_for_medicine(db, medicine, from_date=first_day)
+            last_extended = today
+        check_and_update_occurrences(db)
+    finally:
+        db.close()
+    return last_extended
 
 
 async def scheduler_loop(interval_seconds: int = 30):
@@ -115,21 +135,7 @@ async def scheduler_loop(interval_seconds: int = 30):
     last_extended = None
     while True:
         try:
-            db = SessionLocal()
-            try:
-                today = date.today()
-                if last_extended != today:
-                    latest_dates = dict(db.query(
-                        MedicineOccurrence.medicine_id, func.max(MedicineOccurrence.scheduled_time)
-                    ).group_by(MedicineOccurrence.medicine_id).all())
-                    for medicine in db.query(Medicine).filter_by(is_active=True):
-                        latest = latest_dates.get(medicine.id)
-                        first_day = max(today, latest.date() + timedelta(days=1)) if latest else today
-                        generate_occurrences_for_medicine(db, medicine, from_date=first_day)
-                    last_extended = today
-                check_and_update_occurrences(db)
-            finally:
-                db.close()
+            last_extended = await asyncio.to_thread(run_cycle, last_extended)
         except Exception as e:
             print(f"[SCHEDULER ERROR] Error in worker loop: {e}", file=sys.stderr)
 
