@@ -44,6 +44,8 @@
         .pulse-alert { animation: pulse-ring 2s infinite; }
     </style>
     <link rel="stylesheet" href="/static/care-design.css">
+    <link rel="stylesheet" href="/static/care-motion.css">
+    <script defer src="/static/care-motion.js"></script>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col bg-slate-50">
 
@@ -142,6 +144,14 @@
                 <div class="hero-note"><i class="ph-bold ph-lock-key"></i> Designed for families, built around everyday routines.</div>
                 </div>
                 <div class="hero-visual" aria-label="Illustrative preview of today's medication dashboard">
+                    <div class="motion-stage" aria-hidden="true">
+                        <div class="motion-halo halo-one"></div><div class="motion-halo halo-two"></div>
+                        <div class="motion-capsule capsule-one"><span></span><span></span></div>
+                        <div class="motion-capsule capsule-two"><span></span><span></span></div>
+                        <div class="motion-cross"><i></i><i></i><i></i></div>
+                        <div class="motion-sphere sphere-one"></div><div class="motion-sphere sphere-two"></div>
+                        <div class="motion-particle particle-one"></div><div class="motion-particle particle-two"></div><div class="motion-particle particle-three"></div>
+                    </div>
                     <div class="visual-orbit orbit-a"></div><div class="visual-orbit orbit-b"></div>
                     <div class="preview-board">
                         <div class="preview-header"><div class="preview-logo"><i class="ph-bold ph-heartbeat"></i></div><div><strong>My care plan</strong><small>Today's overview</small></div><span class="preview-tag">PREVIEW</span></div>
@@ -180,6 +190,10 @@
                 </div>
             </div>
             </div>
+            <section class="motion-story" aria-label="How CareSync connects your family">
+                <div class="story-copy"><span class="section-kicker">CONNECTED CARE</span><h2>Two lives.<br>One rhythm.</h2><p>Plan a dose on the parent dashboard. The child sees their schedule, confirms intake, and keeps the family informed.</p><button class="hero-primary" onclick="switchAuthTab('signup')">Start your care plan <i class="ph-bold ph-plus"></i></button></div>
+                <div class="story-scene" aria-hidden="true"><div class="story-orbit"></div><div class="story-device device-parent"><i class="ph-bold ph-users"></i><strong>Parent</strong><small>Schedule created</small><div class="story-line"></div><div class="story-line short"></div></div><div class="story-pulse"><i class="ph-bold ph-heartbeat"></i></div><div class="story-device device-child"><i class="ph-bold ph-device-mobile"></i><strong>Child</strong><small>Dose reminder</small><div class="story-line"></div><div class="story-line short"></div></div></div>
+            </section>
             <footer class="landing-footer"><span>CareSync · Family medication management</span><span>Made for the people who care.</span></footer>
         </section>
 
