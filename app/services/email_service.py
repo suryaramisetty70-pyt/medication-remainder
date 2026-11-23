@@ -1,4 +1,5 @@
 from contextvars import ContextVar
+from base64 import urlsafe_b64encode
 from uuid import uuid4
 import smtplib
 import sys
@@ -18,10 +19,51 @@ mail_error = ContextVar("mail_error", default="Email provider is not configured.
 retryable = ContextVar("mail_retryable", default=False)
 
 
+def send_gmail_email(to_email, subject, body_text, body_html=None):
+    """Send through Gmail's HTTPS API using a renewable send-only OAuth grant."""
+    stage = "OAuth refresh"
+    try:
+        token = httpx.post("https://oauth2.googleapis.com/token", data={
+            "client_id": settings.gmail_client_id,
+            "client_secret": settings.gmail_client_secret,
+            "refresh_token": settings.gmail_refresh_token,
+            "grant_type": "refresh_token",
+        }, timeout=12)
+        token.raise_for_status()
+        access_token = token.json()["access_token"]
+        msg = MIMEMultipart("alternative")
+        msg["From"] = f"CareSync <{settings.gmail_sender}>"
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body_text, "plain", "utf-8"))
+        if body_html:
+            msg.attach(MIMEText(body_html, "html", "utf-8"))
+        stage = "send"
+        response = httpx.post("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": urlsafe_b64encode(msg.as_bytes()).decode("ascii")}, timeout=12)
+        response.raise_for_status()
+        if response.json().get("id"):
+            return True
+        mail_error.set("Gmail API did not return a message ID.")
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code
+        mail_error.set(f"Gmail {stage} failed (HTTP {code}). Check the OAuth grant, Gmail API and sending quota.")
+        retryable.set(code == 429 or code >= 500)
+    except (httpx.HTTPError, ValueError, KeyError, AttributeError):
+        mail_error.set(f"Gmail {stage} connection or response error.")
+        # A send timeout can mean Gmail already accepted it; avoid duplicate sends.
+        retryable.set(stage == "OAuth refresh")
+    print(mail_error.get(), file=sys.stderr)
+    return False
+
+
 def send_raw_email(to_email: str, subject: str, body_text: str, body_html: Optional[str] = None, *, delivery_key: Optional[str] = None) -> bool:
     """Return success when the configured mail provider accepts the message."""
     mail_error.set("Email provider is not configured.")
     retryable.set(False)
+    if settings.gmail_configured:
+        return send_gmail_email(to_email, subject, body_text, body_html)
     if settings.resend_api_key:
         if not settings.email_from:
             return False

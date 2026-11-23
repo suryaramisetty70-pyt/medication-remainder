@@ -99,4 +99,6 @@ For a release check, connect two children and schedule an imminent dose for the 
 
 ### Email on Render Free
 
+For Gmail without a custom domain, enable Gmail API in Google Cloud, create an OAuth web application client with redirect URI `https://developers.google.com/oauthplayground`, and use OAuth Playground with your own client credentials to authorize only `https://www.googleapis.com/auth/gmail.send` with offline access. Exchange the authorization code for a refresh token. For ongoing operation, configure the OAuth consent project appropriately (external apps in Testing can have refresh tokens expire after seven days). Set `GMAIL_SENDER`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN` in Render Environment, then redeploy. Gmail takes precedence when all four are configured. Verify `/api/health` reports `email_provider: gmail` and send a test email to a real parent inbox. Never commit credentials or share them in chat.
+
 Set `RESEND_API_KEY` and `EMAIL_FROM` in the service environment to send email over HTTPS. Use a verified sender for real families. For an initial test, `onboarding@resend.dev` can send to the address registered to your Resend account. After deployment, check `email_configured` at `/api/health`, then verify the missed-dose email in the parent inbox.

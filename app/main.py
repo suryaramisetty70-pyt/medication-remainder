@@ -90,7 +90,8 @@ def health_check():
         "status": "healthy",
         "app": settings.app_name,
         "tagline": settings.app_tagline,
-        "email_configured": bool(settings.email_from) if settings.resend_api_key else bool(settings.smtp_username and settings.smtp_password),
+        "email_configured": settings.gmail_configured or (bool(settings.email_from) if settings.resend_api_key else bool(settings.smtp_username and settings.smtp_password)),
+        "email_provider": "gmail" if settings.gmail_configured else "resend" if settings.resend_api_key else "smtp" if settings.smtp_username and settings.smtp_password else "none",
         "smtp_configured": bool(settings.smtp_username and settings.smtp_password),
     }
 

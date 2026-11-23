@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     smtp_from_name: str = "CareSync Medicine Alert"
     email_from: str = ""
     resend_api_key: str = ""
+    gmail_sender: str = ""
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
+
+    @property
+    def gmail_configured(self) -> bool:
+        return all((self.gmail_sender, self.gmail_client_id, self.gmail_client_secret, self.gmail_refresh_token))
 
     # File Storage
     upload_dir: str = "uploads/proofs"
