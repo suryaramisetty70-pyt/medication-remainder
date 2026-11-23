@@ -46,6 +46,8 @@
     <link rel="stylesheet" href="/static/care-design.css">
     <link rel="stylesheet" href="/static/care-motion.css">
     <script defer src="/static/care-motion.js"></script>
+    <link rel="stylesheet" href="/static/care-cinema.css">
+    <script defer src="/static/care-cinema.js"></script>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col bg-slate-50">
 
@@ -129,7 +131,7 @@
             <div class="care-hero">
                 <div class="hero-copy">
                 <div class="hero-eyebrow"><span class="eyebrow-mark"><i class="ph-bold ph-heartbeat"></i></span> A BETTER WAY TO CARE</div>
-                <h1>Closer care.<br> <span>Healthier days.</span></h1>
+                <h1>Family medication.<br> <span>Redefined.</span></h1>
                 <p>Stay connected to the people you love. Schedule medicines, confirm doses, and receive missed-dose alerts — all in one thoughtfully designed space.</p>
 
                 <!-- Quick Action Buttons -->
@@ -144,6 +146,8 @@
                 <div class="hero-note"><i class="ph-bold ph-lock-key"></i> Designed for families, built around everyday routines.</div>
                 </div>
                 <div class="hero-visual" aria-label="Illustrative preview of today's medication dashboard">
+                    <canvas class="cinema-field" aria-hidden="true"></canvas>
+                    <div class="cinema-bottle" aria-hidden="true"><div class="bottle-cap"></div><div class="bottle-neck"></div><div class="bottle-body"><i class="ph-bold ph-heartbeat"></i><span>CARE</span><div class="bottle-liquid"></div></div></div>
                     <div class="motion-stage" aria-hidden="true">
                         <div class="motion-halo halo-one"></div><div class="motion-halo halo-two"></div>
                         <div class="motion-capsule capsule-one"><span></span><span></span></div>
@@ -194,6 +198,7 @@
                 <div class="story-copy"><span class="section-kicker">CONNECTED CARE</span><h2>Two lives.<br>One rhythm.</h2><p>Plan a dose on the parent dashboard. The child sees their schedule, confirms intake, and keeps the family informed.</p><button class="hero-primary" onclick="switchAuthTab('signup')">Start your care plan <i class="ph-bold ph-plus"></i></button></div>
                 <div class="story-scene" aria-hidden="true"><div class="story-orbit"></div><div class="story-device device-parent"><i class="ph-bold ph-users"></i><strong>Parent</strong><small>Schedule created</small><div class="story-line"></div><div class="story-line short"></div></div><div class="story-pulse"><i class="ph-bold ph-heartbeat"></i></div><div class="story-device device-child"><i class="ph-bold ph-device-mobile"></i><strong>Child</strong><small>Dose reminder</small><div class="story-line"></div><div class="story-line short"></div></div></div>
             </section>
+            <section class="cinema-notify"><div class="cinema-notify-art" aria-hidden="true"><div class="notify-phone"><div class="notify-camera"><i class="ph-bold ph-camera"></i></div><div class="notify-check"><i class="ph-bold ph-check-circle"></i> Photo submitted</div></div><div class="notify-toast"><i class="ph-bold ph-envelope-simple"></i><div><strong>CareSync alert</strong><small>Check your family dashboard</small></div></div><div class="notify-wave"></div></div><div><span class="section-kicker">STAY INFORMED</span><h2>Every confirmation.<br>Every important alert.</h2><p>Photo proof and email notifications help your family stay connected to the medication routine.</p></div></section>
             <footer class="landing-footer"><span>CareSync · Family medication management</span><span>Made for the people who care.</span></footer>
         </section>
 
