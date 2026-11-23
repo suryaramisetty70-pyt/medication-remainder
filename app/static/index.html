@@ -293,7 +293,7 @@
                 <!-- JOIN WITH CODE FORM -->
                 <form id="form-joincode" onsubmit="handleJoinCodeSubmit(event)" class="space-y-4 hidden">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">6-Digit Family Code</label>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Family Access Code</label>
                         <input type="text" id="join-code-input" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white" placeholder="e.g. CARE-A7B2">
                     </div>
                     <button type="submit" class="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-md shadow-brand-500/20 transition flex items-center justify-center space-x-2">
@@ -772,6 +772,12 @@
         // Initialize App
         window.addEventListener('DOMContentLoaded', async () => {
             await checkAuth();
+            const joinCode = new URLSearchParams(window.location.search).get('join');
+            if (joinCode && !currentUser) {
+                document.getElementById('join-code-input').value = joinCode;
+                switchAuthTab('joincode');
+                history.replaceState(null, '', window.location.pathname);
+            }
             startPolling();
         });
 
@@ -1452,7 +1458,7 @@
                                 <span class="px-3 py-1 rounded-full text-xs font-bold ${c.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'} inline-block text-center">
                                     ${c.status === 'ACCEPTED' ? '✓ Connected' : '⏳ Invite Pending'}
                                 </span>
-                                ${c.pairing_code && c.status !== 'ACCEPTED' ? `
+                                ${c.pairing_code && c.status === 'ACCEPTED' ? `
                                 <div class="flex items-center gap-1 mt-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
                                     <span class="text-xs font-mono font-bold text-slate-700" id="code-${c.id}">${c.pairing_code}</span>
                                     <button onclick="navigator.clipboard.writeText('${c.pairing_code}'); showToast('Copied!', 'success')" class="text-slate-400 hover:text-brand-600"><i class="ph-bold ph-copy"></i></button>
@@ -1985,8 +1991,8 @@
             e.preventDefault();
             const payload = {
                 name: document.getElementById('add-child-name').value.trim(),
-                phone: document.getElementById('add-child-phone').value.trim(),
-                email: document.getElementById('add-child-email').value.trim()
+                phone: document.getElementById('add-child-phone').value.trim() || null,
+                email: document.getElementById('add-child-email').value.trim() || null
             };
             try {
                 const res = await apiFetch(`${API_BASE}/relationships/parent/create-child`, {

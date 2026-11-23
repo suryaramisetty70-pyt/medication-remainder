@@ -8,9 +8,9 @@ from app.database import Base
 
 
 def generate_pairing_code():
-    """Generate a unique 6-character alphanumeric code like CARE-A7B2."""
+    """Generate a high-entropy private access code for a managed child profile."""
     chars = string.ascii_uppercase + string.digits
-    code = ''.join(secrets.choice(chars) for _ in range(4))
+    code = ''.join(secrets.choice(chars) for _ in range(15))
     return f"CARE-{code}"
 
 

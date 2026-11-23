@@ -121,7 +121,7 @@ def join_by_family_code(
         )
 
     child = db.query(User).filter(User.id == rel.child_id).first()
-    if not child:
+    if not child or child.hashed_password is not None:
         raise HTTPException(status_code=404, detail="Child profile not found.")
 
     # Issue access token for child
@@ -188,14 +188,13 @@ def send_child_connection_request(
         else:
             # Re-open rejected request
             existing.status = RelationshipStatus.PENDING
-            if not existing.pairing_code:
-                existing.pairing_code = generate_pairing_code()
+            existing.pairing_code = None
             db.commit()
     else:
         rel = ParentChildRelationship(
             parent_id=parent.id,
             child_id=child.id,
-            pairing_code=generate_pairing_code(),
+            pairing_code=None,
             status=RelationshipStatus.PENDING,
         )
         db.add(rel)
@@ -245,7 +244,7 @@ def get_parent_children(
                     phone=child.phone,
                     role=child.role,
                     status=rel.status,
-                    pairing_code=rel.pairing_code,
+                    pairing_code=rel.pairing_code if child.hashed_password is None else None,
                     created_at=rel.created_at,
                     accepted_at=rel.accepted_at,
                 )
@@ -280,7 +279,7 @@ def get_child_connections(
                     phone=parent.phone,
                     role=parent.role,
                     status=rel.status,
-                    pairing_code=rel.pairing_code,
+                    pairing_code=None,
                     created_at=rel.created_at,
                     accepted_at=rel.accepted_at,
                 )
